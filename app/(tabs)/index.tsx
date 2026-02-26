@@ -1,98 +1,185 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { ActionButtons } from "@/components/action-buttons";
+import { EmptyState } from "@/components/empty-state";
+import { PermissionRequest } from "@/components/permission-request";
+import { PhotoSwiper } from "@/components/photo-swiper";
+import { StatsHeader } from "@/components/stats-header";
+import { ThemedView } from "@/components/themed-view";
+import { Button } from "@/components/ui/button";
+import { usePhotos } from "@/hooks/use-photos";
+import { usePhotoStore } from "@/stores/photo-store";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
+import { useCallback } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+  const tabBarHeight = useBottomTabBarHeight();
+  const insets = useSafeAreaInsets();
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+  const {
+    addKeptPhoto,
+    addDeletionPhoto,
+    deletionPhotos,
+    removeDeletionPhoto,
+    clearDeletionPhotos,
+  } = usePhotoStore();
+
+  const {
+    photos,
+    isLoading,
+    hasPermission,
+    permissionDenied,
+    currentIndex,
+    totalCount,
+    deletedCount,
+    requestPermission,
+    markForDeletion,
+    keepPhoto,
+    confirmDeletion,
+    undoLastDeletion,
+  } = usePhotos();
+
+  const currentPhoto = photos[currentIndex];
+
+  const handleDelete = useCallback(() => {
+    if (currentPhoto) {
+      addDeletionPhoto(currentPhoto);
+      markForDeletion(currentPhoto.id);
+    }
+  }, [currentPhoto, markForDeletion, addDeletionPhoto]);
+
+  const handleSwipeLeft = useCallback(
+    (id: string) => {
+      const photo = photos.find((p) => p.id === id);
+      if (photo) {
+        addDeletionPhoto(photo);
+        markForDeletion(id);
+      }
+    },
+    [photos, markForDeletion, addDeletionPhoto],
+  );
+
+  const handleKeep = useCallback(() => {
+    if (currentPhoto) {
+      addKeptPhoto(currentPhoto);
+      keepPhoto();
+    }
+  }, [currentPhoto, keepPhoto, addKeptPhoto]);
+
+  const handleConfirmDeletion = useCallback(async () => {
+    const success = await confirmDeletion();
+    if (success) {
+      clearDeletionPhotos();
+    }
+  }, [confirmDeletion, clearDeletionPhotos]);
+
+  const handleUndo = useCallback(() => {
+    if (deletionPhotos.length > 0) {
+      const lastPhoto = deletionPhotos[deletionPhotos.length - 1];
+      removeDeletionPhoto(lastPhoto.id);
+    }
+    undoLastDeletion();
+  }, [undoLastDeletion, deletionPhotos, removeDeletionPhoto]);
+
+  if (!hasPermission) {
+    return (
+      <PermissionRequest
+        onRequestPermission={requestPermission}
+        permissionDenied={permissionDenied}
+      />
+    );
+  }
+
+  if (photos.length === 0 && !isLoading) {
+    return <EmptyState />;
+  }
+
+  const isComplete = currentIndex >= photos.length && !isLoading;
+
+  return (
+    <ThemedView
+      style={[styles.container, { paddingTop: insets.top }]}
+      transparent
+    >
+      <StatsHeader
+        currentIndex={currentIndex}
+        totalCount={totalCount}
+        deletedCount={deletedCount}
+        actionButton={
+          deletedCount > 0 ? (
+            <Button
+              onPress={handleConfirmDeletion}
+              title={`Delete ${deletedCount}`}
+              style={styles.headerConfirmButton}
+              textStyle={styles.headerConfirmButtonText}
+              variant="danger"
+            />
+          ) : undefined
+        }
+      />
+
+      {isComplete ? (
+        <ScrollView
+          contentContainerStyle={[
+            styles.completeContainer,
+            { paddingBottom: tabBarHeight + 40 },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <EmptyState />
+        </ScrollView>
+      ) : (
+        <>
+          <View style={styles.swiperContainer}>
+            <PhotoSwiper
+              photos={photos}
+              currentIndex={currentIndex}
+              onSwipeLeft={handleSwipeLeft}
+              onSwipeRight={handleKeep}
+            />
+          </View>
+
+          <View style={[styles.footer, { paddingBottom: tabBarHeight + 30 }]}>
+            <ActionButtons
+              onDelete={handleDelete}
+              onKeep={handleKeep}
+              onUndo={handleUndo}
+              canUndo={deletedCount > 0}
+            />
+          </View>
+        </>
+      )}
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  swiperContainer: {
+    flex: 1,
+    minHeight: 200,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  footer: {
+    paddingHorizontal: 16,
+    paddingBottom: 30,
+  },
+  completeContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 40,
+  },
+  headerConfirmButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  headerConfirmButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
