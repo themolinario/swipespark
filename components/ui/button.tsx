@@ -21,6 +21,7 @@ interface ButtonProps {
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
   variant?: ButtonVariant;
+  disabled?: boolean;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -30,16 +31,19 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
   variant = "primary",
+  disabled = false,
 }) => {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
 
   const handlePress = () => {
+    if (disabled) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
   };
 
   const getBackgroundColor = () => {
+    if (disabled) return colorScheme === "dark" ? "#555" : "#ccc";
     switch (variant) {
       case "primary":
         return colors.tint;
@@ -55,6 +59,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
 
   const getTextColor = () => {
+    if (disabled) return colorScheme === "dark" ? "#999" : "#666";
     if (variant === "secondary") {
       return colors.text;
     }
@@ -64,10 +69,12 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <Pressable
       onPress={handlePress}
+      disabled={disabled}
       style={({ pressed }) => [
         styles.container,
         { backgroundColor: getBackgroundColor() },
-        pressed && styles.pressed,
+        pressed && !disabled && styles.pressed,
+        disabled && styles.disabled,
         style,
       ]}
     >
@@ -104,5 +111,8 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  disabled: {
+    opacity: 0.5,
   },
 });

@@ -10,8 +10,16 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 
+import { useDuplicateStore } from "@/stores/duplicate-store";
+import { useEffect } from "react";
+
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+
+  useEffect(() => {
+    // Start background scanner for duplicates
+    useDuplicateStore.getState().startScan();
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

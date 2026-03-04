@@ -132,7 +132,7 @@ export default function KeptPhotosScreen() {
         return newSet;
       });
     }
-  }, [getIndexFromCoordinates, keptPhotos.length, keptPhotos]);
+  }, [getIndexFromCoordinates, keptPhotos]);
 
   const handleDragUpdate = useCallback((x: number, y: number) => {
     if (!isDragging.current) return;

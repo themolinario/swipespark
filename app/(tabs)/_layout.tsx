@@ -58,6 +58,15 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="duplicates"
+        options={{
+          title: "Duplicates",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="copy" size={size} color={color} />
+          ),
+        }}
+      />
     </Tabs>
   );
 }

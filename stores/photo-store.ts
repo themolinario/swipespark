@@ -19,6 +19,8 @@ interface PhotoStore {
   isPhotoKept: (id: string) => boolean;
   isPhotoMarkedForDeletion: (id: string) => boolean;
 
+  removePhotosPermanently: (ids: string[]) => void;
+
   restoredPhotos: PhotoAsset[];
   consumeRestoredPhotos: () => PhotoAsset[];
 }
@@ -71,6 +73,12 @@ export const usePhotoStore = create<PhotoStore>()(
         }),
 
       clearDeletionPhotos: () => set({ deletionPhotos: [] }),
+
+      removePhotosPermanently: (ids) =>
+        set((state) => ({
+          keptPhotos: state.keptPhotos.filter((p) => !ids.includes(p.id)),
+          deletionPhotos: state.deletionPhotos.filter((p) => !ids.includes(p.id)),
+        })),
 
       consumeRestoredPhotos: () => {
         const restored = get().restoredPhotos;

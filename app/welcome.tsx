@@ -1,6 +1,5 @@
 import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/ui/button";
-import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -18,7 +17,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
 
   const logoScale = useSharedValue(0);
   const logoOpacity = useSharedValue(0);
@@ -65,7 +63,17 @@ export default function WelcomeScreen() {
 
     // Hints entrance
     hintOpacity.value = withDelay(1000, withTiming(1, { duration: 800 }));
-  }, []);
+  }, [
+    logoOpacity,
+    logoScale,
+    titleOpacity,
+    titleTranslateY,
+    subtitleOpacity,
+    subtitleTranslateY,
+    buttonOpacity,
+    buttonScale,
+    hintOpacity,
+  ]);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,

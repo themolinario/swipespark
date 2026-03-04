@@ -173,7 +173,7 @@ export default function DeletePhotosScreen() {
         return newSet;
       });
     }
-  }, [getIndexFromCoordinates, deletionPhotos.length, deletionPhotos]);
+  }, [getIndexFromCoordinates, deletionPhotos]);
 
   const handleDragUpdate = useCallback((x: number, y: number) => {
     if (!isDragging.current) return;
@@ -379,20 +379,22 @@ export default function DeletePhotosScreen() {
                 />
                 <Button
                   onPress={handleConfirmDelete}
-                  title={`Delete (${selectedIds.size})`}
-                  icon={<Ionicons name="trash" size={20} color="#fff" />}
+                  title={isDeleting ? "Deleting..." : `Delete (${selectedIds.size})`}
+                  icon={!isDeleting ? <Ionicons name="trash" size={20} color="#fff" /> : undefined}
                   style={[styles.bulkButton, styles.bulkDeleteButton]}
                   variant="danger"
+                  disabled={isDeleting}
                 />
               </View>
             ) : !isSelectMode ? (
               <Button
                 onPress={handleConfirmDelete}
-                title={`Delete ${deletionPhotos.length} photos`}
-                icon={<Ionicons name="trash" size={20} color="#fff" />}
+                title={isDeleting ? "Deleting..." : `Delete ${deletionPhotos.length} photos`}
+                icon={!isDeleting ? <Ionicons name="trash" size={20} color="#fff" /> : undefined}
                 style={styles.deleteButton}
                 textStyle={styles.deleteButtonText}
                 variant="danger"
+                disabled={isDeleting}
               />
             ) : null}
           </View>

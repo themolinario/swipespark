@@ -9,7 +9,7 @@ export const EmptyState = memo(function EmptyState() {
         <ThemedText style={styles.icon}>🎉</ThemedText>
         <ThemedText style={styles.title}>All done!</ThemedText>
         <ThemedText style={styles.description}>
-          You've reviewed all the photos in your camera roll.
+          You&apos;ve reviewed all the photos in your camera roll.
         </ThemedText>
       </View>
     </View>
@@ -18,6 +18,7 @@ export const EmptyState = memo(function EmptyState() {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
@@ -29,6 +30,7 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 80,
+    lineHeight: 100,
     marginBottom: 20,
   },
   title: {
