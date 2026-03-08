@@ -9,6 +9,9 @@ import com.google.mlkit.vision.label.defaults.ImageLabelerOptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 import expo.modules.kotlin.Promise
+import kotlinx.coroutines.*
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class ImageClassifierModule : Module() {
 
@@ -22,7 +25,7 @@ class ImageClassifierModule : Module() {
         if (file.exists()) {
           size = file.length()
         }
-        
+
         if (size <= 0L) {
           try {
             val projection = arrayOf(MediaStore.MediaColumns.SIZE)
@@ -198,7 +201,10 @@ class ImageClassifierModule : Module() {
         val uri = Uri.parse(uriString)
         val context = appContext.reactContext ?: throw Exception("React context not available")
         val image = InputImage.fromFilePath(context, uri)
-        val labeler = ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS)
+        val options = ImageLabelerOptions.Builder()
+          .setConfidenceThreshold(0.3f)
+          .build()
+        val labeler = ImageLabeling.getClient(options)
 
         labeler.process(image)
           .addOnSuccessListener { labels ->
@@ -210,6 +216,66 @@ class ImageClassifierModule : Module() {
           }
       } catch (e: Exception) {
         promise.reject("CLASSIFICATION_ERROR", e.message ?: "Unknown error", e)
+      }
+    }
+
+    AsyncFunction("classifyImages") { uriStrings: List<String>, promise: Promise ->
+      val context = appContext.reactContext ?: run {
+        promise.reject("CONTEXT_ERROR", "React context not available", null)
+        return@AsyncFunction
+      }
+
+      CoroutineScope(Dispatchers.Default).launch {
+        try {
+          val options = ImageLabelerOptions.Builder()
+            .setConfidenceThreshold(0.3f)
+            .build()
+
+          // Process in parallel with limited concurrency
+          val semaphore = kotlinx.coroutines.sync.Semaphore(8)
+          val results = uriStrings.map { uriString ->
+            async {
+              semaphore.acquire()
+              try {
+                val uri = Uri.parse(uriString)
+                val image = InputImage.fromFilePath(context, uri)
+                val labeler = ImageLabeling.getClient(options)
+
+                val labels = suspendCancellableCoroutine<List<Map<String, Any>>> { cont ->
+                  labeler.process(image)
+                    .addOnSuccessListener { mlLabels ->
+                      val labelList = mlLabels.map { label ->
+                        mapOf(
+                          "identifier" to label.text as Any,
+                          "confidence" to label.confidence.toDouble() as Any
+                        )
+                      }
+                      cont.resume(labelList)
+                    }
+                    .addOnFailureListener {
+                      cont.resume(emptyList())
+                    }
+                }
+
+                mapOf(
+                  "uri" to uriString as Any,
+                  "labels" to labels as Any
+                )
+              } catch (_: Exception) {
+                mapOf(
+                  "uri" to uriString as Any,
+                  "labels" to emptyList<Map<String, Any>>() as Any
+                )
+              } finally {
+                semaphore.release()
+              }
+            }
+          }.awaitAll()
+
+          promise.resolve(results)
+        } catch (e: Exception) {
+          promise.reject("BATCH_CLASSIFY_ERROR", e.message ?: "Unknown error", e)
+        }
       }
     }
 

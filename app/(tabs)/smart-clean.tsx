@@ -1,15 +1,16 @@
 import { AnimatedScanner } from "@/components/ui/animated-scanner";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { GlassView } from "@/components/ui/glass-view";
-import { classifyImage } from "@/modules/image-classifier";
+import { classifyImages } from "@/modules/image-classifier";
+import { useClassificationCache, CachedLabel } from "@/stores/classification-cache";
 import { usePhotoStore } from "@/stores/photo-store";
-import { mapLabelsToCategory, matchesCustomQuery, SmartCategory } from "@/utils/category-mapper";
-import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, CheckCircle, Circle, Wand2 } from "lucide-react-native";
+import { mapLabelsToCategory, matchesCustomQuery, SmartCategory, LabelWithConfidence } from "@/utils/category-mapper";
+import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, CheckCircle, Circle, Wand2, X } from "lucide-react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
     FlatList,
     Pressable,
@@ -35,8 +36,10 @@ const CATEGORIES: { label: SmartCategory; Icon: any }[] = [
     { label: "Custom", Icon: Search },
 ];
 
-const CHUNK_SIZE = 100;
-const CONCURRENT_BATCH_SIZE = 10;
+// Fetch 500 assets per page from MediaLibrary for fast iteration
+const FETCH_PAGE_SIZE = 500;
+// Send 50 images per native batch classification call
+const NATIVE_BATCH_SIZE = 50;
 
 export default function SmartCleanScreen() {
     const insets = useSafeAreaInsets();
@@ -46,12 +49,21 @@ export default function SmartCleanScreen() {
     const [customQuery, setCustomQuery] = useState("");
 
     const [progress, setProgress] = useState(0);
+    const [scanStatusText, setScanStatusText] = useState("");
     const [matchedPhotos, setMatchedPhotos] = useState<MediaLibrary.Asset[]>([]);
     const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
+    const [isScanningInBackground, setIsScanningInBackground] = useState(false);
 
     const addDeletionPhoto = usePhotoStore((state) => state.addDeletionPhoto);
     const isPhotoKept = usePhotoStore((state) => state.isPhotoKept);
     const isPhotoMarkedForDeletion = usePhotoStore((state) => state.isPhotoMarkedForDeletion);
+
+    // Cache store accessors
+    const getCachedLabels = useClassificationCache((s) => s.getCachedLabels);
+    const setCachedLabelsBatch = useClassificationCache((s) => s.setCachedLabelsBatch);
+
+    // Abort scan ref
+    const abortRef = useRef(false);
 
     const startScan = async (category: SmartCategory) => {
         setSelectedCategory(category);
@@ -62,11 +74,18 @@ export default function SmartCleanScreen() {
         }
     };
 
+    const cancelScan = useCallback(() => {
+        abortRef.current = true;
+    }, []);
+
     const runScan = async (category: SmartCategory) => {
         setStep("SCANNING");
         setProgress(0);
+        setScanStatusText("Requesting permissions...");
         setMatchedPhotos([]);
         setSelectedForDeletion(new Set());
+        setIsScanningInBackground(false);
+        abortRef.current = false;
 
         try {
             const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -75,23 +94,30 @@ export default function SmartCleanScreen() {
                 return;
             }
 
+            // Clear expired cache entries on scan start
+            useClassificationCache.getState().clearExpired();
+
             let hasNextPage = true;
             let endCursor: string | undefined = undefined;
             const found: MediaLibrary.Asset[] = [];
             let totalProcessed = 0;
 
-            const initialPage = await MediaLibrary.getAssetsAsync({ first: 1 });
+            // Get total count for progress
+            const initialPage = await MediaLibrary.getAssetsAsync({ first: 1, mediaType: "photo" });
             const totalAssetsEstimate = initialPage.totalCount;
 
-            while (hasNextPage) {
+            setScanStatusText(`Scanning ${totalAssetsEstimate} photos...`);
+
+            while (hasNextPage && !abortRef.current) {
                 const page = await MediaLibrary.getAssetsAsync({
-                    first: CHUNK_SIZE,
+                    first: FETCH_PAGE_SIZE,
                     after: endCursor,
                     mediaType: "photo",
                     sortBy: ["modificationTime"],
                 });
 
-                const validAssetsToScan = page.assets.filter(asset => {
+                // Filter out already-processed photos and tiny images
+                const validAssets = page.assets.filter(asset => {
                     if (isPhotoKept(asset.id) || isPhotoMarkedForDeletion(asset.id)) {
                         totalProcessed++;
                         return false;
@@ -103,55 +129,102 @@ export default function SmartCleanScreen() {
                     return true;
                 });
 
-                setProgress(Math.min((totalProcessed / totalAssetsEstimate) * 100, 100));
+                // Split into: cached (instant) and uncached (need native classification)
+                const cachedAssets: { asset: MediaLibrary.Asset; labels: LabelWithConfidence[] }[] = [];
+                const uncachedAssets: MediaLibrary.Asset[] = [];
 
-                for (let i = 0; i < validAssetsToScan.length; i += CONCURRENT_BATCH_SIZE) {
-                    const batch = validAssetsToScan.slice(i, i + CONCURRENT_BATCH_SIZE);
+                for (const asset of validAssets) {
+                    const cached = getCachedLabels(asset.id);
+                    if (cached) {
+                        cachedAssets.push({ asset, labels: cached });
+                    } else {
+                        uncachedAssets.push(asset);
+                    }
+                }
 
-                    const batchPromises = batch.map(async (asset) => {
-                        try {
-                            const assetInfo = await MediaLibrary.getAssetInfoAsync(asset);
-                            const uri = assetInfo.localUri || assetInfo.uri;
-                            if (!uri) return null;
+                // Process cached assets immediately (zero cost)
+                for (const { asset, labels } of cachedAssets) {
+                    totalProcessed++;
+                    const isMatch = checkMatch(category, labels);
+                    if (isMatch) {
+                        found.push(asset);
+                    }
+                }
 
-                            const labels = await classifyImage(uri);
+                // Process uncached assets in native batches
+                for (let i = 0; i < uncachedAssets.length && !abortRef.current; i += NATIVE_BATCH_SIZE) {
+                    const batch = uncachedAssets.slice(i, i + NATIVE_BATCH_SIZE);
+                    const uris = batch.map(a => a.uri);
 
-                            let isMatch: boolean;
-                            if (category === "Custom") {
-                                isMatch = matchesCustomQuery(labels, customQuery);
-                            } else {
-                                const identifiedCategory = mapLabelsToCategory(labels);
-                                isMatch = identifiedCategory === category;
-                            }
+                    try {
+                        const results = await classifyImages(uris);
 
+                        // Cache results and check matches
+                        const cacheEntries: { assetId: string; labels: CachedLabel[] }[] = [];
+
+                        for (let j = 0; j < results.length; j++) {
+                            const result = results[j];
+                            const asset = batch[j];
+                            if (!result || !asset) continue;
+
+                            const labels: LabelWithConfidence[] = (result.labels || []).map(l => ({
+                                identifier: l.identifier,
+                                confidence: l.confidence,
+                            }));
+
+                            // Prepare cache entry
+                            cacheEntries.push({ assetId: asset.id, labels });
+
+                            // Check match
+                            const isMatch = checkMatch(category, labels);
                             if (isMatch) {
-                                return asset;
+                                found.push(asset);
                             }
-                        } catch (e) {
-                            console.warn("Failed to classify image:", asset.id, e);
+
+                            totalProcessed++;
                         }
-                        return null;
-                    });
 
-                    const batchResults = await Promise.all(batchPromises);
-                    const matchedInBatch = batchResults.filter((a): a is MediaLibrary.Asset => a !== null);
-                    found.push(...matchedInBatch);
+                        // Batch cache update
+                        if (cacheEntries.length > 0) {
+                            setCachedLabelsBatch(cacheEntries);
+                        }
+                    } catch (e) {
+                        console.warn("Batch classification failed, skipping batch:", e);
+                        totalProcessed += batch.length;
+                    }
 
-                    totalProcessed += batch.length;
+                    // Update progress
+                    const progressPct = Math.min((totalProcessed / totalAssetsEstimate) * 100, 99);
+                    setProgress(progressPct);
+                    setScanStatusText(`${totalProcessed} / ${totalAssetsEstimate} photos • ${found.length} found`);
 
+                    // Update matched photos incrementally for live preview
+                    if (found.length > 0) {
+                        setMatchedPhotos([...found]);
+                    }
+
+                    // Yield to JS thread
                     await new Promise(resolve => setTimeout(resolve, 0));
-                    setProgress(Math.min((totalProcessed / totalAssetsEstimate) * 100, 100));
+                }
+
+                // If we have enough results and user might want to review, switch to review mode
+                // but keep scanning in background
+                if (found.length >= 20 && step !== "REVIEW_RESULTS" && !isScanningInBackground) {
+                    setMatchedPhotos([...found]);
+                    const newSelected = new Set<string>();
+                    found.forEach(p => newSelected.add(p.id));
+                    setSelectedForDeletion(newSelected);
+                    setIsScanningInBackground(true);
+                    setStep("REVIEW_RESULTS");
                 }
 
                 hasNextPage = page.hasNextPage;
                 endCursor = page.endCursor;
-
-                if (found.length >= 50) {
-                    break;
-                }
             }
 
-            setMatchedPhotos(found);
+            setProgress(100);
+            setScanStatusText(`Done! ${found.length} photos found.`);
+            setMatchedPhotos([...found]);
 
             const newSelected = new Set<string>();
             found.forEach((p: MediaLibrary.Asset) => newSelected.add(p.id));
@@ -160,8 +233,19 @@ export default function SmartCleanScreen() {
         } catch (e) {
             console.error("Scan error:", e);
         } finally {
-            setStep("REVIEW_RESULTS");
+            setIsScanningInBackground(false);
+            if (step !== "REVIEW_RESULTS") {
+                setStep("REVIEW_RESULTS");
+            }
         }
+    };
+
+    const checkMatch = (category: SmartCategory, labels: LabelWithConfidence[]): boolean => {
+        if (category === "Custom") {
+            return matchesCustomQuery(labels, customQuery);
+        }
+        const result = mapLabelsToCategory(labels);
+        return result.category === category;
     };
 
     const toggleSelection = (id: string) => {
@@ -175,6 +259,9 @@ export default function SmartCleanScreen() {
     };
 
     const confirmDeletion = () => {
+        // Stop background scan if still running
+        abortRef.current = true;
+
         const photosToDelete = matchedPhotos.filter(p => selectedForDeletion.has(p.id));
         photosToDelete.forEach(p => {
             addDeletionPhoto(p);
@@ -303,16 +390,29 @@ export default function SmartCleanScreen() {
                 <Text style={styles.scanningSubtitle}>
                     {Math.round(progress)}% complete
                 </Text>
+                {scanStatusText ? (
+                    <Text style={styles.scanningDetail}>{scanStatusText}</Text>
+                ) : null}
                 {progress > 0 && progress < 100 && (
                     <View style={styles.progressBarContainer}>
                         <LinearGradient
                             colors={["#4ade80", "#38E0D2", "#2dd4bf"]}
                             start={{ x: 0, y: 0.5 }}
                             end={{ x: 1, y: 0.5 }}
-                            style={[styles.progressBar, { width: `${progress}%` }]}
+                            style={[styles.progressBar, { width: `${Math.min(progress, 100)}%` }]}
                         />
                     </View>
                 )}
+                <Pressable
+                    style={({ pressed }) => [styles.cancelButton, pressed && { opacity: 0.7 }]}
+                    onPress={() => {
+                        cancelScan();
+                        setStep("SELECT_CATEGORY");
+                    }}
+                >
+                    <X size={18} color="#ff6b6b" />
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                </Pressable>
             </FuturisticHomeBackground>
         );
     }
@@ -322,7 +422,7 @@ export default function SmartCleanScreen() {
         <FuturisticHomeBackground style={styles.container}>
             <View style={[styles.innerContainer, { paddingTop: insets.top }]}>
                 <View style={styles.header}>
-                    <Pressable onPress={() => setStep("SELECT_CATEGORY")} style={styles.backButton}>
+                    <Pressable onPress={() => { cancelScan(); setStep("SELECT_CATEGORY"); }} style={styles.backButton}>
                         <ArrowLeft size={22} color="#4ade80" />
                     </Pressable>
                     <View style={{ flex: 1 }}>
@@ -330,7 +430,7 @@ export default function SmartCleanScreen() {
                             Review {selectedCategory === "Custom" ? `"${customQuery}"` : selectedCategory}
                         </Text>
                         <Text style={styles.subtitle} numberOfLines={3}>
-                            Found {matchedPhotos.length} photos. Deselect any you want to keep.
+                            Found {matchedPhotos.length} photos.{isScanningInBackground ? " Still scanning..." : ""} Deselect any you want to keep.
                         </Text>
                     </View>
                 </View>
@@ -594,6 +694,28 @@ const styles = StyleSheet.create({
         marginTop: 8,
         color: "rgba(74,222,128,0.6)",
     },
+    scanningDetail: {
+        fontSize: 12,
+        marginTop: 4,
+        color: "rgba(255,255,255,0.35)",
+    },
+    cancelButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        marginTop: 24,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 20,
+        backgroundColor: "rgba(255,107,107,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(255,107,107,0.3)",
+    },
+    cancelButtonText: {
+        color: "#ff6b6b",
+        fontSize: 14,
+        fontWeight: "600",
+    },
     progressBarContainer: {
         width: "80%",
         height: 6,
@@ -667,7 +789,7 @@ const styles = StyleSheet.create({
     // ── Footer ──────────────────────────────────────────────────
     footer: {
         position: "absolute",
-        bottom: 0,
+        bottom: 24,
         left: 0,
         right: 0,
         paddingTop: 20,
@@ -686,6 +808,7 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 12,
         shadowOffset: { width: 0, height: 0 },
+        borderWidth: 0,
     },
     deleteFooterButtonText: {
         color: "#fff",
