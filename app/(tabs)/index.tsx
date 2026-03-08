@@ -1,20 +1,28 @@
 import { ActionButtons } from "@/components/action-buttons";
+import { DeletionSuccessModal } from "@/components/deletion-success-modal";
 import { EmptyState } from "@/components/empty-state";
 import { PermissionRequest } from "@/components/permission-request";
 import { PhotoSwiper } from "@/components/photo-swiper";
 import { StatsHeader } from "@/components/stats-header";
-import { ThemedView } from "@/components/themed-view";
-import { Button } from "@/components/ui/button";
+import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { usePhotos } from "@/hooks/use-photos";
+import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { useCallback } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Trash2 } from "lucide-react-native";
+import { useCallback, useState } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
+
+  const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number; freedBytes: number }>({
+    visible: false,
+    count: 0,
+    freedBytes: 0,
+  });
 
   const {
     addKeptPhoto,
@@ -67,11 +75,33 @@ export default function HomeScreen() {
   }, [currentPhoto, keepPhoto, addKeptPhoto]);
 
   const handleConfirmDeletion = useCallback(async () => {
+    // Calcola la dimensione prima di cancellare
+    let freedBytes = 0;
+    try {
+      const uris = deletionPhotos.map((p) => p.uri);
+      const ids = deletionPhotos.map((p) => p.id);
+      if (Platform.OS === 'android') {
+        freedBytes = await getAssetsSizeByIds(ids);
+        if (freedBytes <= 0) {
+          freedBytes = await getAssetsSize(uris);
+        }
+      } else {
+        freedBytes = await getAssetsSizeByIds(ids);
+        if (freedBytes <= 0) {
+          freedBytes = await getAssetsSize(uris);
+        }
+      }
+    } catch {
+      // fallback: procedi senza dimensione
+    }
+
+    const count = deletionPhotos.length;
     const success = await confirmDeletion();
     if (success) {
       clearDeletionPhotos();
+      setSuccessModal({ visible: true, count, freedBytes });
     }
-  }, [confirmDeletion, clearDeletionPhotos]);
+  }, [confirmDeletion, clearDeletionPhotos, deletionPhotos]);
 
   const handleUndo = useCallback(() => {
     if (deletionPhotos.length > 0) {
@@ -97,9 +127,8 @@ export default function HomeScreen() {
   const isComplete = currentIndex >= photos.length && !isLoading;
 
   return (
-    <ThemedView
+    <FuturisticHomeBackground
       style={[styles.container, { paddingTop: insets.top }]}
-      transparent
     >
       <StatsHeader
         currentIndex={currentIndex}
@@ -107,13 +136,19 @@ export default function HomeScreen() {
         deletedCount={deletedCount}
         actionButton={
           deletedCount > 0 ? (
-            <Button
+            <Pressable
               onPress={handleConfirmDeletion}
-              title={`Delete ${deletedCount}`}
-              style={styles.headerConfirmButton}
-              textStyle={styles.headerConfirmButtonText}
-              variant="danger"
-            />
+              style={({ pressed }) => [
+                styles.headerConfirmButton,
+                pressed && styles.headerConfirmButtonPressed,
+              ]}
+            >
+              <View style={styles.headerConfirmButtonGlow} />
+              <Trash2 size={14} color="#ffffff" style={{ marginRight: 6 }} />
+              <Text style={styles.headerConfirmButtonText}>
+                Delete {deletedCount}
+              </Text>
+            </Pressable>
           ) : undefined
         }
       />
@@ -139,7 +174,7 @@ export default function HomeScreen() {
             />
           </View>
 
-          <View style={[styles.footer, { paddingBottom: tabBarHeight + 30 }]}>
+          <View style={[styles.footer, { paddingBottom: tabBarHeight + 80 }]}>
             <ActionButtons
               onDelete={handleDelete}
               onKeep={handleKeep}
@@ -149,7 +184,13 @@ export default function HomeScreen() {
           </View>
         </>
       )}
-    </ThemedView>
+      <DeletionSuccessModal
+        visible={successModal.visible}
+        deletedCount={successModal.count}
+        freedBytes={successModal.freedBytes}
+        onClose={() => setSuccessModal({ visible: false, count: 0, freedBytes: 0 })}
+      />
+    </FuturisticHomeBackground>
   );
 }
 
@@ -173,13 +214,42 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   headerConfirmButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 59, 48, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 59, 48, 0.6)",
+    shadowColor: "#ff3b30",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 12,
+    overflow: "visible",
+  },
+  headerConfirmButtonPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.96 }],
+  },
+  headerConfirmButtonGlow: {
+    position: "absolute",
+    top: -1,
+    left: -1,
+    right: -1,
+    bottom: -1,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 59, 48, 0.08)",
   },
   headerConfirmButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "600",
+    color: "#ff6b6b",
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    textShadowColor: "rgba(255, 59, 48, 0.6)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
   },
 });

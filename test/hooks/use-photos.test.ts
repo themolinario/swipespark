@@ -127,4 +127,66 @@ describe("usePhotos hook", () => {
 
         expect(result.current.currentIndex).toBe(0);
     });
+
+    it("should advance past the last photo after keepPhoto on the final card", async () => {
+        (mediaLibraryService.getPermissionStatus as jest.Mock).mockResolvedValue(
+            "granted"
+        );
+        const mockPhotos = {
+            assets: [
+                { id: "1", uri: "uri1" },
+                { id: "2", uri: "uri2" },
+            ],
+            endCursor: "cursor",
+            hasNextPage: false,
+            totalCount: 2,
+        };
+        (mediaLibraryService.fetchPhotos as jest.Mock).mockResolvedValue(
+            mockPhotos
+        );
+
+        const { result } = renderHook(() => usePhotos());
+
+        await waitFor(() => {
+            expect(result.current.photos.length).toBe(2);
+        });
+
+        act(() => {
+            result.current.keepPhoto();
+            result.current.keepPhoto();
+        });
+
+        expect(result.current.currentIndex).toBe(2);
+    });
+
+    it("should advance past the last photo after markForDeletion on the final card", async () => {
+        (mediaLibraryService.getPermissionStatus as jest.Mock).mockResolvedValue(
+            "granted"
+        );
+        const mockPhotos = {
+            assets: [
+                { id: "1", uri: "uri1" },
+                { id: "2", uri: "uri2" },
+            ],
+            endCursor: "cursor",
+            hasNextPage: false,
+            totalCount: 2,
+        };
+        (mediaLibraryService.fetchPhotos as jest.Mock).mockResolvedValue(
+            mockPhotos
+        );
+
+        const { result } = renderHook(() => usePhotos());
+
+        await waitFor(() => {
+            expect(result.current.photos.length).toBe(2);
+        });
+
+        act(() => {
+            result.current.keepPhoto();
+            result.current.markForDeletion("2");
+        });
+
+        expect(result.current.currentIndex).toBe(2);
+    });
 });

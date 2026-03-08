@@ -1,6 +1,4 @@
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
+import { Heart, Trash2, Undo2 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
@@ -19,8 +17,6 @@ export const ActionButtons = memo(function ActionButtons({
   onUndo,
   canUndo,
 }: ActionButtonsProps) {
-  const colorScheme = useColorScheme() ?? "light";
-  const colors = Colors[colorScheme];
   const handleDelete = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onDelete();
@@ -40,15 +36,15 @@ export const ActionButtons = memo(function ActionButtons({
     <View style={styles.container}>
       <Button
         onPress={handleDelete}
-        icon={<Ionicons name="trash" size={32} color="#fff" />}
-        variant="danger"
-        style={styles.button}
+        icon={<Trash2 size={30} color="#ff3b30" />}
+        variant="secondary" // Use secondary to prevent default primary background
+        style={[styles.button, styles.deleteButton]} // We will override styles completely
       />
 
       {canUndo && (
         <Button
           onPress={handleUndo}
-          icon={<Ionicons name="arrow-undo" size={24} color={colors.text} />}
+          icon={<Undo2 size={24} color="#ffffff" />}
           variant="secondary"
           style={[styles.button, styles.undoButton]}
         />
@@ -56,9 +52,9 @@ export const ActionButtons = memo(function ActionButtons({
 
       <Button
         onPress={handleKeep}
-        icon={<Ionicons name="heart" size={36} color="#fff" />}
-        variant="success"
-        style={styles.button}
+        icon={<Heart size={32} color="#4ade80" />}
+        variant="secondary"
+        style={[styles.button, styles.keepButton]}
       />
     </View>
   );
@@ -79,18 +75,31 @@ const styles = StyleSheet.create({
     borderRadius: 35,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
-    overflow: "visible",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    borderWidth: 1.5,
   },
-
+  deleteButton: {
+    borderColor: "#ff3b30",
+    shadowColor: "#ff3b30",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+  },
+  keepButton: {
+    borderColor: "#4ade80",
+    shadowColor: "#4ade80",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+  },
   undoButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    // backgroundColor: '#8e8e93', // Removed for glass effect
+    borderColor: "rgba(255, 255, 255, 0.4)",
+    shadowColor: "#ffffff",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
 });

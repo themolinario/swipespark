@@ -1,5 +1,9 @@
 import '@testing-library/jest-native/extend-expect';
 
+declare global {
+  var __ExpoImportMetaRegistry: unknown;
+}
+
 // Mock Expo Router
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -35,9 +39,11 @@ jest.mock('expo-haptics', () => ({
   },
 }));
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
+jest.mock('lucide-react-native', () => {
+  return new Proxy({}, {
+    get: (target, prop) => prop,
+  });
+});
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
@@ -46,13 +52,13 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 // Eagerly trigger Expo's lazy global getters so they require() modules inside test scope
 try {
   require('expo/src/winter/runtime.native');
-  const _1 = global.__ExpoImportMetaRegistry;
-  const _2 = global.TextDecoder;
-  const _3 = global.TextDecoderStream;
-  const _4 = global.TextEncoderStream;
-  const _5 = global.URL;
-  const _6 = global.URLSearchParams;
-  const _7 = global.structuredClone;
+  void global.__ExpoImportMetaRegistry;
+  void global.TextDecoder;
+  void global.TextDecoderStream;
+  void global.TextEncoderStream;
+  void global.URL;
+  void global.URLSearchParams;
+  void global.structuredClone;
 } catch (e) {
   // ignore
 }

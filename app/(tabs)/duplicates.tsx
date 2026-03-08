@@ -1,14 +1,13 @@
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { AnimatedScanner } from "@/components/ui/animated-scanner";
 import { Button } from "@/components/ui/button";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { useDuplicates } from "@/hooks/use-duplicates";
 import { DuplicateGroup } from "@/utils/duplicate-detection";
-import { Ionicons } from "@expo/vector-icons";
+import { Check, AlertCircle, Images, RefreshCcw, Zap, XCircle, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     Alert,
@@ -23,15 +22,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PADDING = 20;
-const GAP = 2;
-// In each group a row of photos is shown.
+const GAP = 3;
 const PHOTO_SIZE = (SCREEN_WIDTH - PADDING * 2 - GAP * 2) / 3;
 
 export default function DuplicatesScreen() {
     const tabBarHeight = useBottomTabBarHeight();
     const insets = useSafeAreaInsets();
-    const colorScheme = useColorScheme();
-    const colors = Colors[colorScheme ?? "light"];
 
     const {
         duplicateGroups,
@@ -46,16 +42,14 @@ export default function DuplicatesScreen() {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // Flatten photos for easy index-based gesture selection
     const flatPhotos = duplicateGroups.flatMap(g => g.photos);
 
-    // Drag to select state
     const [isScrollingDisabled, setIsScrollingDisabled] = useState(false);
     const isDragging = useRef(false);
     const scrollOffset = useRef(0);
     const startDragIndex = useRef<number | null>(null);
     const lastToggledIndex = useRef<number | null>(null);
-    const isSelectingRef = useRef(true); // true = adding to selection, false = removing
+    const isSelectingRef = useRef(true);
     const flatListRef = useRef<FlatList>(null);
     const listStartY = useRef(0);
     const listContainerRef = useRef<View>(null);
@@ -65,12 +59,11 @@ export default function DuplicatesScreen() {
     const currentTouchX = useRef<number>(0);
 
     useEffect(() => {
-        // Auto-scan on mount if not already scanned
         if (duplicateGroups.length === 0 && !isScanning) {
             scanDuplicates();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run once on mount
+    }, []);
 
     const handleToggleSelect = useCallback((id: string) => {
         setSelectedIds((prev) => {
@@ -88,7 +81,6 @@ export default function DuplicatesScreen() {
         setSelectedIds((prev) => {
             const newSet = new Set(prev);
             for (const group of duplicateGroups) {
-                // Keep the first photo (oldest/newest based on sort) and select the rest
                 for (let i = 1; i < group.photos.length; i++) {
                     newSet.add(group.photos[i].id);
                 }
@@ -128,66 +120,37 @@ export default function DuplicatesScreen() {
     // --- Drag to Select Logic ---
 
     const getIndexFromCoordinates = useCallback((x: number, y: number) => {
-        // x and y from GestureDetector are LOCAL to the listContainer
         const contentY = y + scrollOffset.current;
         if (contentY < 0) return null;
 
         const relativeX = x - PADDING;
         if (relativeX < 0) return null;
 
-        // Group size calculation:
-        // A group has a header (approx 40px)
-        // Then rows of photos
-        // This is complex for SectionList or grouped FlatList.
-        // For simplicity in drag-to-select, we might need a simpler mapping
-        // or just accept drag within a specific bounds.
-        // Actually, since this is a grouped list, exact coordinate mapping is very tricky.
-        // Let's implement a simpler list view for gestures or skip exact coordinates
-        // if it's too complex, but let's try a basic approximation if possible.
-        // Since groups have variable heights, it's safer to not map exact Y to index here
-        // or just use the standard toggle for now.
-        // Wait, the user specifically asked for "mancano le gestures"!
-        // Let's implement it! We need to know where each photo is.
-        // The easiest way is to flatten the list and use a single FlatList instead of wrapping in groups,
-        // BUT groups are useful. Let's stick to the current UI and do our best.
-
-        // Finding the index directly isn't as trivial as in kept.tsx since we have group headers.
-        // We'll iterate through our group bounds to see where the tap/drag is.
-        // But to do that we need to record the bounds of each group and its photos.
-
-        // Let's implement dynamic layout tracking.
         let currentY = 0;
         let cumulativeIndex = 0;
 
         for (let i = 0; i < duplicateGroups.length; i++) {
             const group = duplicateGroups[i];
 
-            // Header is roughly ~40px + 8px margin bottom = 48px
-            // Wait, we can use exact measurements if we enforce them, or we can use onLayout on each group.
-            // A simpler heuristic for drag to select based on assumptions:
-            const HEADER_HEIGHT = 48; // Adjust based on styles.groupHeader + margins
-            const GROUP_MB = 24;      // styles.groupContainer marginBottom
+            const HEADER_HEIGHT = 48;
+            const GROUP_MB = 24;
 
             const rows = Math.ceil(group.photos.length / 3);
             const photosHeight = rows * (PHOTO_SIZE + GAP);
             const groupHeight = HEADER_HEIGHT + photosHeight + GROUP_MB;
 
-            // Is the touch within this group's Y bounds?
             if (contentY >= currentY && contentY < currentY + groupHeight - GROUP_MB) {
-                // It's in this group! Let's find exactly which photo.
                 const relativeY = contentY - currentY;
 
-                // Is it on the header?
                 if (relativeY < HEADER_HEIGHT) {
-                    return null; // Tapping/dragging on header text
+                    return null;
                 }
 
-                // In the photos area
                 const photoAreaY = relativeY - HEADER_HEIGHT;
                 const row = Math.floor(photoAreaY / (PHOTO_SIZE + GAP));
                 const col = Math.floor(relativeX / (PHOTO_SIZE + GAP));
 
-                if (col >= 3) return null; // 3 columns
+                if (col >= 3) return null;
 
                 const indexInGroup = row * 3 + col;
 
@@ -333,15 +296,17 @@ export default function DuplicatesScreen() {
                                     style={styles.photoContainer}
                                     onPress={() => handleToggleSelect(photo.id)}
                                 >
-                                    <Image
-                                        source={{ uri: photo.uri }}
-                                        style={[styles.photo, isSelected && styles.photoSelected]}
-                                        contentFit="cover"
-                                        transition={200}
-                                    />
+                                    <View style={[styles.photoWrapper, isSelected && styles.photoWrapperSelected]}>
+                                        <Image
+                                            source={{ uri: photo.uri }}
+                                            style={[styles.photo, isSelected && styles.photoSelected]}
+                                            contentFit="cover"
+                                            transition={200}
+                                        />
+                                    </View>
                                     {isSelected && (
                                         <View style={styles.checkCircleSelected}>
-                                            <Ionicons name="checkmark" size={16} color="#fff" />
+                                            <Check size={14} color="#fff" />
                                         </View>
                                     )}
                                 </Pressable>
@@ -359,8 +324,8 @@ export default function DuplicatesScreen() {
             const progressPercent = Math.round(progress * 100);
             return (
                 <View style={styles.emptyContainer}>
-                    <View style={{ marginBottom: 20 }}>
-                        <AnimatedScanner color={colors.tint} size={80} />
+                    <View style={styles.emptyIconGlow}>
+                        <AnimatedScanner color="#4ade80" size={72} />
                     </View>
                     <ThemedText style={styles.emptyTitle}>Scanning Library...</ThemedText>
                     <ThemedText style={styles.emptySubtitle}>
@@ -368,9 +333,14 @@ export default function DuplicatesScreen() {
                     </ThemedText>
 
                     <View style={styles.progressBarContainer}>
-                        <View style={[styles.progressBarFill, { width: `${progressPercent}%`, backgroundColor: colors.tint }]} />
+                        <LinearGradient
+                            colors={["#4ade80", "#38E0D2"]}
+                            start={{ x: 0, y: 0.5 }}
+                            end={{ x: 1, y: 0.5 }}
+                            style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
+                        />
                     </View>
-                    <ThemedText style={{ marginTop: 12, opacity: 0.6 }}>
+                    <ThemedText style={styles.progressText}>
                         {(progress * 100).toFixed(1)}% Complete
                     </ThemedText>
                 </View>
@@ -380,42 +350,43 @@ export default function DuplicatesScreen() {
         if (hasPermission === false) {
             return (
                 <View style={styles.emptyContainer}>
-                    <Ionicons name="alert-circle-outline" size={80} color={colors.icon} />
+                    <View style={styles.emptyIconGlow}>
+                        <AlertCircle size={72} color="#4ade80" />
+                    </View>
                     <ThemedText style={styles.emptyTitle}>Permission Needed</ThemedText>
                     <ThemedText style={styles.emptySubtitle}>
                         Please grant access to your photo library to find duplicates.
                     </ThemedText>
-                    <Button
-                        title="Grant Permission"
-                        onPress={scanDuplicates}
-                        style={{ marginTop: 20 }}
-                    />
+                    <Pressable onPress={scanDuplicates} style={styles.scanAgainButton}>
+                        <AlertCircle size={20} color="#4ade80" />
+                        <ThemedText style={styles.scanAgainText}>Grant Permission</ThemedText>
+                    </Pressable>
                 </View>
             );
         }
 
         return (
             <View style={styles.emptyContainer}>
-                <Ionicons name="images-outline" size={80} color={colors.icon} />
+                <View style={styles.emptyIconGlow}>
+                    <Images size={72} color="#4ade80" />
+                </View>
                 <ThemedText style={styles.emptyTitle}>No Duplicates Found</ThemedText>
                 <ThemedText style={styles.emptySubtitle}>
                     We couldn&apos;t find any exact copies in your library.
                 </ThemedText>
-                <Button
-                    title="Scan Again"
-                    onPress={scanDuplicates}
-                    style={{ marginTop: 20 }}
-                    variant="secondary"
-                />
+                <Pressable onPress={scanDuplicates} style={styles.scanAgainButton}>
+                    <RefreshCcw size={20} color="#4ade80" />
+                    <ThemedText style={styles.scanAgainText}>Scan Again</ThemedText>
+                </Pressable>
             </View>
         );
     };
 
     return (
-        <ThemedView
+        <FuturisticHomeBackground
             style={[styles.container, { paddingTop: insets.top }]}
-            transparent
         >
+            {/* Header */}
             <View style={styles.header}>
                 <View>
                     <ThemedText style={styles.title}>Duplicates</ThemedText>
@@ -427,33 +398,33 @@ export default function DuplicatesScreen() {
                 </View>
                 {!isScanning && duplicateGroups.length > 0 && (
                     <Pressable onPress={scanDuplicates} style={styles.actionIcon}>
-                        <Ionicons name="refresh" size={24} color={colors.icon} />
+                        <RefreshCcw size={22} color="#4ade80" />
                     </Pressable>
                 )}
             </View>
+
+            {/* Neon separator */}
+            <LinearGradient
+                colors={["rgba(74,222,128,0)", "rgba(74,222,128,0.5)", "rgba(74,222,128,0)"]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={styles.headerSeparator}
+            />
 
             {duplicateGroups.length === 0 ? (
                 renderEmptyState()
             ) : (
                 <>
                     <View style={styles.toolbar}>
-                        <Button
-                            title="Auto-Select"
-                            onPress={handleAutoSelect}
-                            style={styles.toolbarButton}
-                            variant="secondary"
-                            textStyle={styles.toolbarButtonText}
-                            icon={<Ionicons name="flash-outline" size={16} color={colors.text} />}
-                        />
+                        <Pressable onPress={handleAutoSelect} style={styles.toolbarButton}>
+                            <Zap size={15} color="#4ade80" />
+                            <ThemedText style={styles.toolbarButtonText}>Auto-Select</ThemedText>
+                        </Pressable>
                         {selectedIds.size > 0 && (
-                            <Button
-                                title="Clear"
-                                onPress={handleClearSelection}
-                                style={styles.toolbarButton}
-                                variant="secondary"
-                                textStyle={styles.toolbarButtonText}
-                                icon={<Ionicons name="close-circle-outline" size={16} color={colors.text} />}
-                            />
+                            <Pressable onPress={handleClearSelection} style={styles.toolbarButton}>
+                                <XCircle size={15} color="#4ade80" />
+                                <ThemedText style={styles.toolbarButtonText}>Clear</ThemedText>
+                            </Pressable>
                         )}
                     </View>
 
@@ -499,7 +470,7 @@ export default function DuplicatesScreen() {
                                         : `Delete ${selectedIds.size} ${selectedIds.size === 1 ? "Copy" : "Copies"
                                         }`
                                 }
-                                icon={!isDeleting ? <Ionicons name="trash" size={20} color="#fff" /> : undefined}
+                                icon={!isDeleting ? <Trash2 size={20} color="#fff" /> : undefined}
                                 style={styles.deleteButton}
                                 textStyle={styles.deleteButtonText}
                                 variant="danger"
@@ -509,7 +480,7 @@ export default function DuplicatesScreen() {
                     )}
                 </>
             )}
-        </ThemedView>
+        </FuturisticHomeBackground>
     );
 }
 
@@ -519,57 +490,89 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingVertical: 16,
+        paddingTop: 16,
+        paddingBottom: 12,
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+    },
+    headerSeparator: {
+        height: 1,
+        marginHorizontal: 20,
+        marginBottom: 4,
     },
     title: {
         fontSize: 28,
         fontWeight: "bold",
         lineHeight: 34,
+        color: "#fff",
+        textShadowColor: "rgba(74,222,128,0.3)",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 10,
     },
     count: {
-        fontSize: 16,
-        opacity: 0.6,
+        fontSize: 14,
+        color: "rgba(74,222,128,0.7)",
+        marginTop: 2,
     },
     actionIcon: {
-        padding: 8,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: "rgba(74,222,128,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.3)",
+        justifyContent: "center",
+        alignItems: "center",
     },
     toolbar: {
         flexDirection: "row",
         paddingHorizontal: 20,
         marginBottom: 12,
-        gap: 12,
+        gap: 10,
     },
     toolbarButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
         paddingVertical: 8,
-        paddingHorizontal: 12,
-        borderRadius: 16,
+        paddingHorizontal: 14,
+        borderRadius: 20,
+        backgroundColor: "rgba(74,222,128,0.08)",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.25)",
     },
     toolbarButtonText: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: "600",
+        color: "#4ade80",
     },
     listContent: {
         paddingHorizontal: PADDING,
     },
     groupContainer: {
         marginBottom: 24,
+        backgroundColor: "rgba(74,222,128,0.03)",
+        borderRadius: 14,
+        padding: 12,
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.08)",
     },
     groupHeader: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        marginBottom: 8,
+        marginBottom: 10,
     },
     groupTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: "600",
+        color: "#fff",
     },
     groupSubtitle: {
-        fontSize: 14,
-        opacity: 0.6,
+        fontSize: 13,
+        color: "rgba(74,222,128,0.6)",
+        marginTop: 2,
     },
     groupPhotos: {
         flexDirection: "row",
@@ -577,16 +580,30 @@ const styles = StyleSheet.create({
         gap: GAP,
     },
     photoContainer: {
-        width: PHOTO_SIZE,
-        height: PHOTO_SIZE,
+        width: PHOTO_SIZE - 8,
+        height: PHOTO_SIZE - 8,
+    },
+    photoWrapper: {
+        flex: 1,
+        borderRadius: 10,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.12)",
+    },
+    photoWrapperSelected: {
+        borderColor: "rgba(74,222,128,0.6)",
+        shadowColor: "#4ade80",
+        shadowOpacity: 0.4,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
     },
     photo: {
         width: "100%",
         height: "100%",
-        borderRadius: 8,
     },
     photoSelected: {
-        opacity: 0.6,
+        opacity: 0.65,
     },
     checkCircleSelected: {
         position: "absolute",
@@ -595,11 +612,16 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: "#007AFF",
-        borderColor: "#007AFF",
-        borderWidth: 2,
+        backgroundColor: "#4ade80",
+        borderColor: "#4ade80",
+        borderWidth: 1.5,
         justifyContent: "center",
         alignItems: "center",
+        shadowColor: "#4ade80",
+        shadowOpacity: 0.6,
+        shadowRadius: 6,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 6,
     },
     emptyContainer: {
         flex: 1,
@@ -607,17 +629,70 @@ const styles = StyleSheet.create({
         alignItems: "center",
         paddingHorizontal: 40,
     },
+    emptyIconGlow: {
+        padding: 20,
+        borderRadius: 60,
+        backgroundColor: "transparent",
+        shadowColor: "#4ade80",
+        shadowOpacity: 0.4,
+        shadowRadius: 30,
+        shadowOffset: { width: 0, height: 0 },
+    },
     emptyTitle: {
         fontSize: 22,
-        fontWeight: "600",
-        marginTop: 20,
+        fontWeight: "700",
+        marginTop: 24,
         marginBottom: 12,
+        color: "#fff",
+        textShadowColor: "rgba(74,222,128,0.2)",
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 8,
     },
     emptySubtitle: {
-        fontSize: 16,
-        opacity: 0.6,
+        fontSize: 15,
+        color: "rgba(255,255,255,0.45)",
         textAlign: "center",
-        lineHeight: 24,
+        lineHeight: 22,
+    },
+    scanAgainButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
+        marginTop: 28,
+        paddingVertical: 14,
+        paddingHorizontal: 32,
+        borderRadius: 24,
+        backgroundColor: "rgba(74,222,128,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.4)",
+        shadowColor: "#4ade80",
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+    },
+    scanAgainText: {
+        fontSize: 16,
+        fontWeight: "600",
+        color: "#4ade80",
+        letterSpacing: 0.5,
+    },
+    progressBarContainer: {
+        width: "100%",
+        height: 6,
+        backgroundColor: "rgba(74,222,128,0.1)",
+        borderRadius: 3,
+        marginTop: 24,
+        overflow: "hidden",
+    },
+    progressBarFill: {
+        height: "100%",
+        borderRadius: 3,
+    },
+    progressText: {
+        marginTop: 12,
+        fontSize: 13,
+        color: "rgba(74,222,128,0.6)",
     },
     deleteButtonContainer: {
         position: "absolute",
@@ -631,8 +706,13 @@ const styles = StyleSheet.create({
         alignItems: "center",
         justifyContent: "center",
         paddingVertical: 16,
-        borderRadius: 12,
+        borderRadius: 14,
         gap: 8,
+        shadowColor: "#ff3b30",
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 8,
     },
     deleteButtonText: {
         color: "#fff",
@@ -642,16 +722,4 @@ const styles = StyleSheet.create({
     listContainer: {
         flex: 1,
     },
-    progressBarContainer: {
-        width: "100%",
-        height: 6,
-        backgroundColor: "rgba(150, 150, 150, 0.2)",
-        borderRadius: 3,
-        marginTop: 24,
-        overflow: "hidden",
-    },
-    progressBarFill: {
-        height: "100%",
-        borderRadius: 3,
-    }
 });

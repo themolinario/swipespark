@@ -11,8 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "The app needs access to your photos to help you free up space."
-      }
+        "NSPhotoLibraryUsageDescription": "The app needs access to your photos to help you free up space.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.themolinario.swipespark"
     },
     "android": {
       "adaptiveIcon": {
@@ -44,8 +46,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/logo.png",
-          "imageWidth": 200,
+          "image": "./assets/images/splash.png",
+          "imageWidth": 1536,
+          "imageHeight": 2752,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {

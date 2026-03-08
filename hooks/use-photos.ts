@@ -172,7 +172,7 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
   }, [currentIndex, photos.length, fetchPhotos]);
 
   const moveToNext = useCallback(() => {
-    setCurrentIndex((prev) => Math.min(prev + 1, photos.length - 1));
+    setCurrentIndex((prev) => Math.min(prev + 1, photos.length));
   }, [photos.length]);
 
   const markForDeletion = useCallback(

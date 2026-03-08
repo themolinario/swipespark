@@ -8,10 +8,7 @@ jest.mock("@/hooks/use-duplicates", () => ({
     useDuplicates: jest.fn(),
 }));
 
-// Mock Ionicons and AnimatedScanner to avoid issues with native modules
-jest.mock("@expo/vector-icons", () => ({
-    Ionicons: () => "IoniconsMock",
-}));
+// Mock AnimatedScanner to avoid issues with native modules
 jest.mock("@/components/ui/animated-scanner", () => ({
     AnimatedScanner: () => "AnimatedScannerMock",
 }));

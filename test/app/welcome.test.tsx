@@ -23,18 +23,17 @@ describe("Welcome Screen", () => {
     it("renders correctly", () => {
         const { getByText } = render(<WelcomeScreen />);
 
-        expect(getByText("SwipeSpark")).toBeTruthy();
+        expect(getByText(/WELCOME TO THE/i)).toBeTruthy();
+        expect(getByText(/FUTURE OF PHOTO CLEANING/i)).toBeTruthy();
         expect(
-            getByText("Free up space on your phone\nwith a simple swipe")
+            getByText("Optimized Swipe for clearing memory, automated duplicate removal, and AI-powered image analysis.")
         ).toBeTruthy();
-        expect(getByText("Swipe left to delete")).toBeTruthy();
-        expect(getByText("Swipe right to keep")).toBeTruthy();
     });
 
     it("navigates to tabs on start button press", () => {
         const { getByText } = render(<WelcomeScreen />);
 
-        const startButton = getByText("Start");
+        const startButton = getByText("START CLEANING");
         fireEvent.press(startButton);
 
         expect(router.replace).toHaveBeenCalledWith("/(tabs)");

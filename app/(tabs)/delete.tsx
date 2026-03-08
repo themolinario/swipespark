@@ -1,21 +1,23 @@
+import { DeletionSuccessModal } from "@/components/deletion-success-modal";
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { Button } from "@/components/ui/button";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
+import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import {
   mediaLibraryService,
   PhotoAsset,
 } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
-import { Ionicons } from "@expo/vector-icons";
+import { Check, Undo2, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useRef, useState } from "react";
 import {
   Alert,
   Dimensions,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   View
@@ -25,26 +27,28 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const COLUMN_COUNT = 3;
-const GAP = 2;
+const GAP = 3;
 const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 
 export default function DeletePhotosScreen() {
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
   const [isDeleting, setIsDeleting] = useState(false);
+  const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number; freedBytes: number }>({
+    visible: false,
+    count: 0,
+    freedBytes: 0,
+  });
 
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // Drag to select state
   const [isScrollingDisabled, setIsScrollingDisabled] = useState(false);
   const isDragging = useRef(false);
   const scrollOffset = useRef(0);
   const startDragIndex = useRef<number | null>(null);
   const lastToggledIndex = useRef<number | null>(null);
-  const isSelectingRef = useRef(true); // true = adding to selection, false = removing
+  const isSelectingRef = useRef(true);
   const flatListRef = useRef<FlatList>(null);
   const listStartY = useRef(0);
   const listContainerRef = useRef<View>(null);
@@ -105,7 +109,26 @@ export default function DeletePhotosScreen() {
 
     setIsDeleting(true);
     try {
+      const uris = photosToDelete.map((p) => p.uri);
       const ids = photosToDelete.map((p) => p.id);
+
+      let freedBytes = 0;
+      try {
+        if (Platform.OS === 'android') {
+          freedBytes = await getAssetsSizeByIds(ids);
+          if (freedBytes <= 0) {
+            freedBytes = await getAssetsSize(uris);
+          }
+        } else {
+          freedBytes = await getAssetsSizeByIds(ids);
+          if (freedBytes <= 0) {
+            freedBytes = await getAssetsSize(uris);
+          }
+        }
+      } catch {
+        // fallback
+      }
+
       const success = await mediaLibraryService.deleteAssets(ids);
 
       if (success) {
@@ -116,7 +139,7 @@ export default function DeletePhotosScreen() {
         } else {
           clearDeletionPhotos();
         }
-        Alert.alert("Success", `${ids.length} photos permanently deleted.`);
+        setSuccessModal({ visible: true, count: ids.length, freedBytes });
       } else {
         Alert.alert("Error", "Could not delete photos.");
       }
@@ -132,21 +155,14 @@ export default function DeletePhotosScreen() {
     toggleSelectMode();
   }, [selectedIds, removeDeletionPhoto, toggleSelectMode]);
 
-  // --- Drag to Select Logic ---
-
   const getIndexFromCoordinates = useCallback((x: number, y: number) => {
-    // x and y from GestureDetector are LOCAL to the listContainer
     const contentY = y + scrollOffset.current;
     if (contentY < 0) return null;
-
     const relativeX = x - GAP;
     if (relativeX < 0) return null;
-
     const row = Math.floor(contentY / (ITEM_SIZE + GAP));
     const col = Math.floor(relativeX / (ITEM_SIZE + GAP));
-
     if (col >= COLUMN_COUNT) return null;
-
     const index = row * COLUMN_COUNT + col;
     return index >= 0 && index < deletionPhotos.length ? index : null;
   }, [deletionPhotos.length]);
@@ -155,12 +171,10 @@ export default function DeletePhotosScreen() {
     isDragging.current = true;
     setIsScrollingDisabled(true);
     const index = getIndexFromCoordinates(x, y);
-
     if (index !== null) {
       startDragIndex.current = index;
       lastToggledIndex.current = index;
       const photo = deletionPhotos[index];
-
       setSelectedIds((prev) => {
         const newSet = new Set(prev);
         if (newSet.has(photo.id)) {
@@ -179,9 +193,7 @@ export default function DeletePhotosScreen() {
     if (!isDragging.current) return;
     currentTouchX.current = x;
     currentTouchY.current = y;
-
     const currentIndex = getIndexFromCoordinates(x, y);
-
     if (
       currentIndex !== null &&
       currentIndex !== lastToggledIndex.current &&
@@ -189,7 +201,6 @@ export default function DeletePhotosScreen() {
     ) {
       const minIdx = Math.min(startDragIndex.current, currentIndex);
       const maxIdx = Math.max(startDragIndex.current, currentIndex);
-
       setSelectedIds((prev) => {
         const next = new Set(prev);
         for (let i = minIdx; i <= maxIdx; i++) {
@@ -201,7 +212,6 @@ export default function DeletePhotosScreen() {
         }
         return next;
       });
-
       lastToggledIndex.current = currentIndex;
     }
   }, [getIndexFromCoordinates, deletionPhotos]);
@@ -219,23 +229,16 @@ export default function DeletePhotosScreen() {
 
   const autoScroll = useCallback(() => {
     if (!isDragging.current || !flatListRef.current) return;
-
     const y = currentTouchY.current;
     const x = currentTouchX.current;
-
-    // Auto-scroll thresholds
     const SCROLL_ZONE = 80;
     const SCROLL_SPEED = 15;
-
     const listHeight = Dimensions.get("window").height - listStartY.current - insets.top;
-
     if (y < SCROLL_ZONE) {
-      // Scroll Up
       const newOffset = Math.max(0, scrollOffset.current - SCROLL_SPEED);
       flatListRef.current.scrollToOffset({ offset: newOffset, animated: false });
       handleDragUpdate(x, y - SCROLL_SPEED);
     } else if (y > listHeight - SCROLL_ZONE) {
-      // Scroll Down
       const newOffset = scrollOffset.current + SCROLL_SPEED;
       flatListRef.current.scrollToOffset({ offset: newOffset, animated: false });
       handleDragUpdate(x, y + SCROLL_SPEED);
@@ -257,8 +260,6 @@ export default function DeletePhotosScreen() {
     .onEnd(() => handleDragEnd())
     .onFinalize(() => handleDragEnd());
 
-  // --- End Drag to Select ---
-
   const renderItem = useCallback(
     ({ item }: { item: PhotoAsset }) => {
       const isSelected = selectedIds.has(item.id);
@@ -273,19 +274,21 @@ export default function DeletePhotosScreen() {
           }}
           onPress={() => handleRemovePhoto(item)}
         >
-          <Image
-            source={{ uri: item.uri }}
-            style={[styles.photo, isSelected && styles.photoSelected]}
-            contentFit="cover"
-            transition={200}
-          />
+          <View style={[styles.photoWrapper, isSelected && styles.photoWrapperSelected]}>
+            <Image
+              source={{ uri: item.uri }}
+              style={[styles.photo, isSelected && styles.photoSelected]}
+              contentFit="cover"
+              transition={200}
+            />
+          </View>
           {isSelectMode ? (
             <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
-              {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+              {isSelected && <Check size={14} color="#fff" />}
             </View>
           ) : (
             <View style={styles.restoreIconContainer}>
-              <Ionicons name="arrow-undo-circle" size={24} color="#4CAF50" />
+              <Undo2 size={18} color="#4ade80" />
             </View>
           )}
         </Pressable>
@@ -296,7 +299,9 @@ export default function DeletePhotosScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="trash-outline" size={80} color={colors.icon} />
+      <View style={styles.emptyIconGlow}>
+        <Trash2 size={72} color="#ff6b6b" />
+      </View>
       <ThemedText style={styles.emptyTitle}>No photos to delete</ThemedText>
       <ThemedText style={styles.emptySubtitle}>
         Swipe left on photos you want to delete{"\n"}to see them here
@@ -305,10 +310,10 @@ export default function DeletePhotosScreen() {
   );
 
   return (
-    <ThemedView
+    <FuturisticHomeBackground
       style={[styles.container, { paddingTop: insets.top }]}
-      transparent
     >
+      {/* Header */}
       <View style={styles.header}>
         <View>
           <ThemedText style={styles.title}>
@@ -332,6 +337,14 @@ export default function DeletePhotosScreen() {
         )}
       </View>
 
+      {/* Neon separator */}
+      <LinearGradient
+        colors={["rgba(255,107,107,0)", "rgba(255,107,107,0.5)", "rgba(255,107,107,0)"]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        style={styles.headerSeparator}
+      />
+
       {deletionPhotos.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -354,7 +367,7 @@ export default function DeletePhotosScreen() {
                 scrollEventThrottle={16}
                 contentContainerStyle={[
                   styles.listContent,
-                  { paddingBottom: 100 + insets.bottom },
+                  { paddingBottom: tabBarHeight + 80 },
                 ]}
                 showsVerticalScrollIndicator={true}
                 scrollEnabled={!isScrollingDisabled}
@@ -365,7 +378,7 @@ export default function DeletePhotosScreen() {
           <View
             style={[
               styles.deleteButtonContainer,
-              { bottom: tabBarHeight + 20, paddingBottom: 0 },
+              { bottom: tabBarHeight + 40 },
             ]}
           >
             {isSelectMode && selectedIds.size > 0 ? (
@@ -373,14 +386,14 @@ export default function DeletePhotosScreen() {
                 <Button
                   onPress={handleRestoreSelected}
                   title={`Restore (${selectedIds.size})`}
-                  icon={<Ionicons name="arrow-undo" size={20} color="#fff" />}
+                  icon={<Undo2 size={20} color="#fff" />}
                   style={[styles.bulkButton, styles.bulkRestoreButton]}
                   variant="success"
                 />
                 <Button
                   onPress={handleConfirmDelete}
                   title={isDeleting ? "Deleting..." : `Delete (${selectedIds.size})`}
-                  icon={!isDeleting ? <Ionicons name="trash" size={20} color="#fff" /> : undefined}
+                  icon={!isDeleting ? <Trash2 size={20} color="#fff" /> : undefined}
                   style={[styles.bulkButton, styles.bulkDeleteButton]}
                   variant="danger"
                   disabled={isDeleting}
@@ -390,7 +403,7 @@ export default function DeletePhotosScreen() {
               <Button
                 onPress={handleConfirmDelete}
                 title={isDeleting ? "Deleting..." : `Delete ${deletionPhotos.length} photos`}
-                icon={!isDeleting ? <Ionicons name="trash" size={20} color="#fff" /> : undefined}
+                icon={!isDeleting ? <Trash2 size={20} color="#fff" /> : undefined}
                 style={styles.deleteButton}
                 textStyle={styles.deleteButtonText}
                 variant="danger"
@@ -400,7 +413,14 @@ export default function DeletePhotosScreen() {
           </View>
         </>
       )}
-    </ThemedView>
+
+      <DeletionSuccessModal
+        visible={successModal.visible}
+        deletedCount={successModal.count}
+        freedBytes={successModal.freedBytes}
+        onClose={() => setSuccessModal({ visible: false, count: 0, freedBytes: 0 })}
+      />
+    </FuturisticHomeBackground>
   );
 }
 
@@ -410,25 +430,37 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  headerSeparator: {
+    height: 1,
+    marginHorizontal: 20,
+    marginBottom: 4,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
     lineHeight: 34,
+    color: "#fff",
+    textShadowColor: "rgba(255,107,107,0.3)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
   count: {
-    fontSize: 16,
-    opacity: 0.6,
+    fontSize: 14,
+    color: "rgba(255,107,107,0.7)",
+    marginTop: 2,
   },
   hint: {
-    fontSize: 14,
-    opacity: 0.5,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.4)",
     textAlign: "center",
-    marginBottom: 12,
+    marginBottom: 10,
+    letterSpacing: 0.5,
   },
   listContainer: {
     flex: 1,
@@ -441,10 +473,24 @@ const styles = StyleSheet.create({
     height: ITEM_SIZE,
     margin: GAP / 2,
   },
+  photoWrapper: {
+    flex: 1,
+    borderRadius: 10,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(255,107,107,0.12)",
+  },
+  photoWrapperSelected: {
+    borderColor: "rgba(255,107,107,0.6)",
+    shadowColor: "#ff6b6b",
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
+  },
   photo: {
     width: "100%",
     height: "100%",
-    borderRadius: 8,
     opacity: 0.7,
   },
   photoSelected: {
@@ -452,10 +498,16 @@ const styles = StyleSheet.create({
   },
   restoreIconContainer: {
     position: "absolute",
-    top: 4,
-    right: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
-    borderRadius: 12,
+    top: 6,
+    right: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderWidth: 1,
+    borderColor: "rgba(74,222,128,0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   emptyContainer: {
     flex: 1,
@@ -463,17 +515,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 40,
   },
+  emptyIconGlow: {
+    padding: 20,
+    borderRadius: 60,
+    backgroundColor: "transparent",
+    shadowColor: "#ff6b6b",
+    shadowOpacity: 0.4,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 0 },
+  },
   emptyTitle: {
     fontSize: 22,
-    fontWeight: "600",
-    marginTop: 20,
+    fontWeight: "700",
+    marginTop: 24,
     marginBottom: 12,
+    color: "#fff",
+    textShadowColor: "rgba(255,107,107,0.2)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 8,
   },
   emptySubtitle: {
-    fontSize: 16,
-    opacity: 0.6,
+    fontSize: 15,
+    color: "rgba(255,255,255,0.45)",
     textAlign: "center",
-    lineHeight: 24,
+    lineHeight: 22,
   },
   checkCircle: {
     position: "absolute",
@@ -482,25 +547,33 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#fff",
-    backgroundColor: "rgba(0,0,0,0.3)",
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
   checkCircleSelected: {
-    backgroundColor: "#007AFF",
-    borderColor: "#007AFF",
+    backgroundColor: "#ff6b6b",
+    borderColor: "#ff6b6b",
+    shadowColor: "#ff6b6b",
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 6,
   },
   selectButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "rgba(150, 150, 150, 0.2)",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,107,107,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,107,107,0.3)",
   },
   selectButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
+    color: "#ff6b6b",
   },
   deleteButtonContainer: {
     position: "absolute",
@@ -516,8 +589,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 8,
+    shadowColor: "#ff3b30",
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
   deleteButtonText: {
     color: "#fff",
@@ -531,18 +609,19 @@ const styles = StyleSheet.create({
   bulkButton: {
     flex: 1,
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     gap: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 8,
   },
   bulkRestoreButton: {
     backgroundColor: "#34c759",
+    shadowColor: "#34c759",
   },
   bulkDeleteButton: {
     backgroundColor: "#ff3b30",
-  },
-  cancelButtonText: {
-    color: "#333",
-    fontSize: 16,
-    fontWeight: "600",
+    shadowColor: "#ff3b30",
   },
 });

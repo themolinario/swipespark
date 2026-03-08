@@ -96,15 +96,15 @@ export const PhotoCard = memo(function PhotoCard({
         <Animated.View
           style={[styles.indicator, styles.deleteIndicator, leftIndicatorStyle]}
         >
-          <View style={styles.indicatorContent}>
-            <Animated.Text style={styles.indicatorText}>🗑️</Animated.Text>
+          <View style={[styles.indicatorContent, styles.deleteIndicatorContent]}>
+            <Animated.Text style={[styles.indicatorText, styles.deleteIndicatorText]}>TRASH</Animated.Text>
           </View>
         </Animated.View>
         <Animated.View
           style={[styles.indicator, styles.keepIndicator, rightIndicatorStyle]}
         >
-          <View style={styles.indicatorContent}>
-            <Animated.Text style={styles.indicatorText}>💚</Animated.Text>
+          <View style={[styles.indicatorContent, styles.keepIndicatorContent]}>
+            <Animated.Text style={[styles.indicatorText, styles.keepIndicatorText]}>KEEP</Animated.Text>
           </View>
         </Animated.View>
       </Animated.View>
@@ -119,10 +119,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     overflow: "hidden",
     position: "absolute",
-    backgroundColor: "#1a1a1a",
-    shadowColor: "#000",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(74, 222, 128, 0.3)",
+    shadowColor: "#4ade80",
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 10,
   },
@@ -140,20 +142,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deleteIndicator: {
-    backgroundColor: "rgba(255, 59, 48, 0.3)",
+    backgroundColor: "rgba(255, 59, 48, 0.15)",
   },
   keepIndicator: {
-    backgroundColor: "rgba(52, 199, 89, 0.3)",
+    backgroundColor: "rgba(74, 222, 128, 0.15)",
   },
   indicatorContent: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+  },
+  deleteIndicatorContent: {
+    borderColor: "#ff3b30",
+    shadowColor: "#ff3b30",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
+  },
+  keepIndicatorContent: {
+    borderColor: "#4ade80",
+    shadowColor: "#4ade80",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 15,
+    elevation: 10,
   },
   indicatorText: {
-    fontSize: 40,
+    fontSize: 32,
+    fontWeight: "800",
+    letterSpacing: 4,
+  },
+  deleteIndicatorText: {
+    color: "#ff3b30",
+    textShadowColor: "#ff3b30",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
+  },
+  keepIndicatorText: {
+    color: "#4ade80",
+    textShadowColor: "#4ade80",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
 });

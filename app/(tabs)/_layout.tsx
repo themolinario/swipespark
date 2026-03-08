@@ -1,34 +1,14 @@
-import { GlassView } from "@/components/ui/glass-view";
-import { Colors } from "@/constants/theme";
-import { useColorScheme } from "@/hooks/use-color-scheme";
-import { Ionicons } from "@expo/vector-icons";
+import { FuturisticTabBar } from "@/components/ui/futuristic-tab-bar";
+import { Images, Heart, Trash2, Copy, Wand2 } from "lucide-react-native";
 import { Tabs } from "expo-router";
-import { StyleSheet } from "react-native";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? "light"];
-
   return (
     <Tabs
+      tabBar={(props) => <FuturisticTabBar {...props} />}
       screenOptions={{
         headerShown: false,
         sceneStyle: { backgroundColor: "transparent" },
-        tabBarActiveTintColor: colors.tint,
-        tabBarInactiveTintColor: colors.tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: "transparent",
-          position: "absolute",
-          borderTopWidth: 0,
-          elevation: 0,
-        },
-        tabBarBackground: () => (
-          <GlassView
-            style={StyleSheet.absoluteFill}
-            tint="default"
-            glassStyle="regular"
-          />
-        ),
       }}
     >
       <Tabs.Screen
@@ -36,34 +16,43 @@ export default function TabLayout() {
         options={{
           title: "Swipe",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="images" size={size} color={color} />
+            <Images size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="kept"
         options={{
-          title: "To Keep",
+          title: "Keep",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="heart" size={size} color={color} />
+            <Heart size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="delete"
         options={{
-          title: "To Delete",
+          title: "Delete",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="trash" size={size} color={color} />
+            <Trash2 size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="duplicates"
         options={{
-          title: "Duplicates",
+          title: "Dupes",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="copy" size={size} color={color} />
+            <Copy size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="smart-clean"
+        options={{
+          title: "Smart",
+          tabBarIcon: ({ color, size }) => (
+            <Wand2 size={size} color={color} />
           ),
         }}
       />

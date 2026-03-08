@@ -1,14 +1,16 @@
 import { ThemedText } from "@/components/themed-text";
-import { Button } from "@/components/ui/button";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { FuturisticWelcomeBackground } from "@/components/ui/futuristic-welcome-background";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect } from "react";
-import { Image, StyleSheet, View } from "react-native";
+import { Image, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
+  Easing,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withRepeat,
   withSpring,
   withTiming,
 } from "react-native-reanimated";
@@ -16,227 +18,200 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
-  const colorScheme = useColorScheme();
-
-  const logoScale = useSharedValue(0);
-  const logoOpacity = useSharedValue(0);
-
-  const titleTranslateY = useSharedValue(20);
-  const titleOpacity = useSharedValue(0);
-
-  const subtitleTranslateY = useSharedValue(20);
-  const subtitleOpacity = useSharedValue(0);
 
   const buttonScale = useSharedValue(0);
   const buttonOpacity = useSharedValue(0);
-
-  const hintOpacity = useSharedValue(0);
+  const buttonGlow = useSharedValue(0);
 
   useEffect(() => {
-    // Logo entrance
-    logoOpacity.value = withDelay(100, withTiming(1, { duration: 600 }));
-    logoScale.value = withDelay(
-      100,
-      withSpring(1, { damping: 12, stiffness: 100 }),
+    buttonOpacity.value = withDelay(400, withTiming(1, { duration: 800 }));
+    buttonScale.value = withDelay(400, withSpring(1, { damping: 12, stiffness: 100 }));
+
+    buttonGlow.value = withDelay(
+      1200,
+      withRepeat(
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.sin) }),
+        -1,
+        true
+      )
     );
-
-    // Title entrance
-    titleOpacity.value = withDelay(300, withTiming(1, { duration: 600 }));
-    titleTranslateY.value = withDelay(
-      300,
-      withSpring(0, { damping: 12, stiffness: 90 }),
-    );
-
-    // Subtitle entrance
-    subtitleOpacity.value = withDelay(500, withTiming(1, { duration: 600 }));
-    subtitleTranslateY.value = withDelay(
-      500,
-      withSpring(0, { damping: 12, stiffness: 90 }),
-    );
-
-    // Button entrance
-    buttonOpacity.value = withDelay(700, withTiming(1, { duration: 600 }));
-    buttonScale.value = withDelay(
-      700,
-      withSpring(1, { damping: 12, stiffness: 100 }),
-    );
-
-    // Hints entrance
-    hintOpacity.value = withDelay(1000, withTiming(1, { duration: 800 }));
-  }, [
-    logoOpacity,
-    logoScale,
-    titleOpacity,
-    titleTranslateY,
-    subtitleOpacity,
-    subtitleTranslateY,
-    buttonOpacity,
-    buttonScale,
-    hintOpacity,
-  ]);
-
-  const logoAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }],
-  }));
-
-  const titleAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-    transform: [{ translateY: titleTranslateY.value }],
-  }));
-
-  const subtitleAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: subtitleOpacity.value,
-    transform: [{ translateY: subtitleTranslateY.value }],
-  }));
+  }, [buttonGlow, buttonOpacity, buttonScale]);
 
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonOpacity.value,
     transform: [{ scale: buttonScale.value }],
   }));
 
-  const hintContainerStyle = useAnimatedStyle(() => ({
-    opacity: hintOpacity.value,
+  const buttonGlowAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(buttonGlow.value, [0, 1], [0.3, 0.8]),
+    transform: [{ scale: interpolate(buttonGlow.value, [0, 1], [1, 1.05]) }],
   }));
 
-  const handleStart = () => {
-    router.replace("/(tabs)");
-  };
-
-  // Gradient colors based on theme
-  const gradientColors =
-    colorScheme === "dark"
-      ? (["#0f0c29", "#302b63", "#24243e"] as const) // Deep purple/dark blue gradient for dark mode
-      : (["#ffffff", "#e6f7ff", "#d6efff"] as const); // White to light blue for light mode
-
   return (
-    <LinearGradient
-      colors={gradientColors}
-      style={[
-        styles.container,
-        { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 20 },
-      ]}
-    >
-      <View style={styles.content}>
-        <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-          <View style={styles.logo}>
-            <Image
-              source={require("../assets/images/logo.png")}
-              style={styles.logoImage}
-              resizeMode="contain"
-            />
+    <FuturisticWelcomeBackground>
+      <View style={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.heroContainer}>
+          <View style={styles.logoShadowContainer}>
+            <View style={styles.logoMask}>
+              <Image
+                source={require("../assets/images/logo.png")}
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
+            </View>
           </View>
-        </Animated.View>
+        </View>
 
-        <Animated.View style={titleAnimatedStyle}>
-          <ThemedText style={styles.title}>SwipeSpark</ThemedText>
-        </Animated.View>
-
-        <Animated.View style={subtitleAnimatedStyle}>
-          <ThemedText style={styles.subtitle}>
-            Free up space on your phone{"\n"}with a simple swipe
+        <View style={styles.textContainer}>
+          <ThemedText style={styles.title}>
+            WELCOME TO THE{"\n"}
+            <ThemedText style={styles.titleHighlight}>FUTURE OF PHOTO CLEANING.</ThemedText>
           </ThemedText>
+
+          <ThemedText style={styles.subtitle}>
+            Optimized Swipe for clearing memory, automated duplicate removal, and AI-powered image analysis.
+          </ThemedText>
+        </View>
+
+        <Animated.View style={[styles.buttonWrapper, buttonAnimatedStyle]}>
+          <Animated.View style={[styles.buttonGlowBackground, buttonGlowAnimatedStyle]} pointerEvents="none" />
+          <Pressable onPress={() => router.replace("/(tabs)")} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
+            <LinearGradient
+              colors={["rgba(66, 245, 135, 0.18)", "rgba(33, 90, 58, 0.18)", "rgba(56, 224, 210, 0.12)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.buttonGradient}
+            />
+            <View style={styles.buttonInnerBorder}>
+              <ThemedText style={styles.buttonText}>START CLEANING</ThemedText>
+            </View>
+          </Pressable>
         </Animated.View>
       </View>
-
-      <Animated.View style={[styles.buttonContainer, buttonAnimatedStyle]}>
-        <Button
-          title="Start"
-          onPress={handleStart}
-          style={styles.startButton}
-          textStyle={styles.startButtonText}
-        />
-
-        <Animated.View style={[styles.hintsContainer, hintContainerStyle]}>
-          <View style={styles.hintRow}>
-            <ThemedText style={styles.hintIcon}>←</ThemedText>
-            <ThemedText style={styles.hintText}>
-              Swipe left to delete
-            </ThemedText>
-          </View>
-
-          <View style={styles.hintRow}>
-            <ThemedText style={styles.hintText}>Swipe right to keep</ThemedText>
-            <ThemedText style={styles.hintIcon}>→</ThemedText>
-          </View>
-        </Animated.View>
-      </Animated.View>
-    </LinearGradient>
+    </FuturisticWelcomeBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    overflow: "visible",
-  },
   content: {
-    flexGrow: 1,
-    justifyContent: "center",
+    flex: 1,
+    justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 24,
-    overflow: "visible",
   },
-  logoContainer: {
-    marginBottom: -40,
-    zIndex: 10,
-    overflow: "visible",
-  },
-  logo: {
-    width: 300,
+  heroContainer: {
     height: 300,
+    width: "100%",
     justifyContent: "center",
     alignItems: "center",
+    marginTop: 20,
+  },
+  logoShadowContainer: {
+    width: 190,
+    height: 190,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#42F587",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.95,
+    shadowRadius: 40,
+    elevation: 20,
+  },
+  logoMask: {
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1.2,
+    borderColor: "rgba(66, 245, 135, 0.45)",
+    backgroundColor: "rgba(10, 20, 14, 0.58)",
   },
   logoImage: {
-    width: 500,
-    height: 500,
+    width: "105%",
+    height: "105%",
+  },
+  textContainer: {
+    alignItems: "center",
+    gap: 16,
+    maxWidth: "100%",
+    marginBottom: 40,
+    paddingHorizontal: 8,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontWeight: "800",
     textAlign: "center",
-    marginBottom: 12,
-    lineHeight: 40,
+    color: "#ffffff",
+    letterSpacing: 1,
+    lineHeight: 38,
+  },
+  titleHighlight: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: "#42F587",
+    textShadowColor: "rgba(56, 224, 210, 0.75)",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 14,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: "center",
-    opacity: 0.7,
+    color: "rgba(232, 251, 240, 0.82)",
     lineHeight: 24,
+    maxWidth: "90%",
   },
-  buttonContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
+  buttonWrapper: {
+    width: "100%",
     alignItems: "center",
+    marginBottom: 30,
   },
-  startButton: {
+  buttonGradient: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  buttonGlowBackground: {
+    position: "absolute",
+    width: "90%",
+    height: 60,
     borderRadius: 30,
-    marginBottom: 12,
-    paddingHorizontal: 48,
-    paddingVertical: 14,
+    backgroundColor: "rgba(33, 90, 58, 0.42)",
+    shadowColor: "#38E0D2",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 28,
+    elevation: 20,
   },
-  startButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  hintsContainer: {
+  button: {
+    width: "90%",
+    height: 60,
+    borderRadius: 30,
+    overflow: "hidden",
+    justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    borderWidth: 1.5,
+    borderColor: "rgba(66, 245, 135, 0.9)",
+    backgroundColor: "rgba(10, 20, 14, 0.78)",
   },
-  hintRow: {
-    flexDirection: "row",
+  buttonPressed: {
+    transform: [{ scale: 0.96 }],
+    backgroundColor: "rgba(66, 245, 135, 0.12)",
+  },
+  buttonInnerBorder: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    borderWidth: 1,
+    borderColor: "rgba(56, 224, 210, 0.38)",
+    borderRadius: 30,
   },
-  hintText: {
-    fontSize: 14,
-    opacity: 0.6,
-  },
-  hintIcon: {
+  buttonText: {
+    color: "#E8FBF0",
     fontSize: 16,
-    opacity: 0.8,
     fontWeight: "bold",
+    letterSpacing: 2,
+    textShadowColor: "#42F587",
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 10,
   },
 });

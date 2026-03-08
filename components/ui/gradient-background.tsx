@@ -9,8 +9,8 @@ export function GradientBackground({ children, style, ...props }: ViewProps) {
   // Reuse gradient colors from welcome screen for consistency
   const gradientColors =
     colorScheme === "dark"
-      ? (["#0f0c29", "#302b63", "#24243e"] as const) // Deep purple/dark blue gradient for dark mode
-      : (["#ffffff", "#e6f7ff", "#d6efff"] as const); // White to light blue for light mode
+      ? (["#010D08", "#0E291B", "#000000"] as const) // Deep green/black gradient for dark mode
+      : (["#f0faf4", "#d6f5e0", "#e8faf0"] as const); // White to light green for light mode
 
   return (
     <LinearGradient

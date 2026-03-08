@@ -22,11 +22,14 @@ describe("ActionButtons Component", () => {
             />
         );
 
-        // Using UNSAFE_getByType since we are mocking vector-icons
-        const icons = UNSAFE_getByType(View).findAllByType("Ionicons" as any);
-        expect(icons.some((icon: any) => icon.props.name === "trash")).toBe(true);
-        expect(icons.some((icon: any) => icon.props.name === "heart")).toBe(true);
-        expect(icons.some((icon: any) => icon.props.name === "arrow-undo")).toBe(false);
+        // Using UNSAFE_getByType since we are mocking lucide-react-native globally
+        const trashIcons = UNSAFE_getByType(View).findAllByType("Trash2" as any);
+        const heartIcons = UNSAFE_getByType(View).findAllByType("Heart" as any);
+        const undoIcons = UNSAFE_getByType(View).findAllByType("Undo2" as any);
+
+        expect(trashIcons.length).toBeGreaterThan(0);
+        expect(heartIcons.length).toBeGreaterThan(0);
+        expect(undoIcons.length).toBe(0);
     });
 
     it("renders undo button if canUndo is true", () => {
@@ -39,7 +42,7 @@ describe("ActionButtons Component", () => {
             />
         );
 
-        const icons = UNSAFE_getByType(View).findAllByType("Ionicons" as any);
-        expect(icons.some((icon: any) => icon.props.name === "arrow-undo")).toBe(true);
+        const undoIcons = UNSAFE_getByType(View).findAllByType("Undo2" as any);
+        expect(undoIcons.length).toBeGreaterThan(0);
     });
 });
