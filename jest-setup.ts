@@ -49,6 +49,14 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+jest.mock('@/modules/duplicate-detector', () => ({
+  DuplicateDetectorModule: {
+    computeHashes: jest.fn().mockResolvedValue({}),
+    addListener: jest.fn().mockReturnValue({ remove: jest.fn() }),
+  },
+  computeHashes: jest.fn().mockResolvedValue({}),
+}));
+
 // Eagerly trigger Expo's lazy global getters so they require() modules inside test scope
 try {
   require('expo/src/winter/runtime.native');

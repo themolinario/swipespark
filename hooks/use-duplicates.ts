@@ -43,6 +43,8 @@ export function useDuplicates() {
                 useDuplicateStore.getState().removeDuplicatesLocally(photoIds);
                 // Ensure they don't appear in Kept/Delete tabs anymore
                 usePhotoStore.getState().removePhotosPermanently(photoIds);
+                // Notify usePhotos (index) about permanent deletion
+                usePhotoStore.getState().bumpDeletionVersion();
             }
             return success;
         } catch (error) {

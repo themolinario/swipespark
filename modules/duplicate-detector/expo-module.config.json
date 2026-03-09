@@ -1,0 +1,10 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["DuplicateDetectorModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.duplicatedetector.DuplicateDetectorModule"]
+  }
+}
+

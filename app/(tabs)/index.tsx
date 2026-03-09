@@ -8,6 +8,7 @@ import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-backgr
 import { usePhotos } from "@/hooks/use-photos";
 import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import { usePhotoStore } from "@/stores/photo-store";
+import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Trash2 } from "lucide-react-native";
 import { useCallback, useState } from "react";
@@ -96,8 +97,11 @@ export default function HomeScreen() {
     }
 
     const count = deletionPhotos.length;
+    const ids = deletionPhotos.map((p) => p.id);
     const success = await confirmDeletion();
     if (success) {
+      // Update duplicate store – remove deleted photos from duplicate groups
+      useDuplicateStore.getState().removeDuplicatesLocally(ids);
       clearDeletionPhotos();
       setSuccessModal({ visible: true, count, freedBytes });
     }

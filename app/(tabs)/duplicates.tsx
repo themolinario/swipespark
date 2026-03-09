@@ -22,8 +22,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const PADDING = 20;
+const GROUP_PADDING = 12;
+const GROUP_BORDER = 1;
 const GAP = 3;
-const PHOTO_SIZE = (SCREEN_WIDTH - PADDING * 2 - GAP * 2) / 3;
+const COLUMNS = 3;
+const PHOTO_SIZE = Math.floor(
+    (SCREEN_WIDTH - PADDING * 2 - (GROUP_PADDING + GROUP_BORDER) * 2 - GAP * (COLUMNS - 1)) / COLUMNS
+);
 
 export default function DuplicatesScreen() {
     const tabBarHeight = useBottomTabBarHeight();
@@ -440,7 +445,7 @@ export default function DuplicatesScreen() {
                                 keyExtractor={(item) => item.id}
                                 contentContainerStyle={[
                                     styles.listContent,
-                                    { paddingBottom: tabBarHeight + 100 },
+                                    { paddingBottom: tabBarHeight + 130 },
                                 ]}
                                 showsVerticalScrollIndicator={false}
                                 onLayout={(e) => {
@@ -459,7 +464,7 @@ export default function DuplicatesScreen() {
                         <View
                             style={[
                                 styles.deleteButtonContainer,
-                                { bottom: tabBarHeight + 20 },
+                                { bottom: tabBarHeight + 52 },
                             ]}
                         >
                             <Button
@@ -580,8 +585,8 @@ const styles = StyleSheet.create({
         gap: GAP,
     },
     photoContainer: {
-        width: PHOTO_SIZE - 8,
-        height: PHOTO_SIZE - 8,
+        width: PHOTO_SIZE,
+        height: PHOTO_SIZE,
     },
     photoWrapper: {
         flex: 1,

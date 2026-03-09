@@ -21,6 +21,10 @@ interface PhotoStore {
 
   removePhotosPermanently: (ids: string[]) => void;
 
+  /** Incremented every time photos are permanently deleted from device; usePhotos reacts to this */
+  deletionVersion: number;
+  bumpDeletionVersion: () => void;
+
   restoredPhotos: PhotoAsset[];
   consumeRestoredPhotos: () => PhotoAsset[];
 }
@@ -31,6 +35,7 @@ export const usePhotoStore = create<PhotoStore>()(
       keptPhotos: [],
       deletionPhotos: [],
       restoredPhotos: [],
+      deletionVersion: 0,
 
       addKeptPhoto: (photo) =>
         set((state) => {
@@ -78,6 +83,11 @@ export const usePhotoStore = create<PhotoStore>()(
         set((state) => ({
           keptPhotos: state.keptPhotos.filter((p) => !ids.includes(p.id)),
           deletionPhotos: state.deletionPhotos.filter((p) => !ids.includes(p.id)),
+        })),
+
+      bumpDeletionVersion: () =>
+        set((state) => ({
+          deletionVersion: state.deletionVersion + 1,
         })),
 
       consumeRestoredPhotos: () => {

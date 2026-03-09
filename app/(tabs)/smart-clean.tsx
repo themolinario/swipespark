@@ -1,11 +1,11 @@
 import { AnimatedScanner } from "@/components/ui/animated-scanner";
+import { Button } from "@/components/ui/button";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
-import { GlassView } from "@/components/ui/glass-view";
 import { classifyImages } from "@/modules/image-classifier";
 import { useClassificationCache, CachedLabel } from "@/stores/classification-cache";
 import { usePhotoStore } from "@/stores/photo-store";
 import { mapLabelsToCategory, matchesCustomQuery, SmartCategory, LabelWithConfidence } from "@/utils/category-mapper";
-import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, CheckCircle, Circle, Wand2, X } from "lucide-react-native";
+import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, CheckCircle, Circle, Wand2, X, Trash2 } from "lucide-react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
@@ -22,6 +22,7 @@ import {
     View
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 type WizardStep = "SELECT_CATEGORY" | "ENTER_CUSTOM_QUERY" | "SCANNING" | "REVIEW_RESULTS";
 
@@ -43,6 +44,7 @@ const NATIVE_BATCH_SIZE = 50;
 
 export default function SmartCleanScreen() {
     const insets = useSafeAreaInsets();
+    const tabBarHeight = useBottomTabBarHeight();
 
     const [step, setStep] = useState<WizardStep>("SELECT_CATEGORY");
     const [selectedCategory, setSelectedCategory] = useState<SmartCategory | null>(null);
@@ -462,7 +464,7 @@ export default function SmartCleanScreen() {
                             data={matchedPhotos}
                             keyExtractor={(item) => item.id}
                             numColumns={3}
-                            contentContainerStyle={styles.gridContent}
+                            contentContainerStyle={[styles.gridContent, { paddingBottom: tabBarHeight + 130 }]}
                             renderItem={({ item }) => {
                                 const selected = selectedForDeletion.has(item.id);
                                 return (
@@ -495,20 +497,23 @@ export default function SmartCleanScreen() {
                             }}
                         />
 
-                        <GlassView style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 20) + 70 }]}>
-                            <Pressable
-                                style={({ pressed }) => [
-                                    styles.deleteFooterButton,
-                                    { opacity: selectedForDeletion.size === 0 ? 0.4 : (pressed ? 0.8 : 1) },
+                        {selectedForDeletion.size > 0 && (
+                            <View
+                                style={[
+                                    styles.deleteButtonContainer,
+                                    { bottom: tabBarHeight + 52 },
                                 ]}
-                                disabled={selectedForDeletion.size === 0}
-                                onPress={confirmDeletion}
                             >
-                                <Text style={styles.deleteFooterButtonText}>
-                                    Move {selectedForDeletion.size} to Trash
-                                </Text>
-                            </Pressable>
-                        </GlassView>
+                                <Button
+                                    onPress={confirmDeletion}
+                                    title={`Delete ${selectedForDeletion.size} ${selectedForDeletion.size === 1 ? "Photo" : "Photos"}`}
+                                    icon={<Trash2 size={20} color="#fff" />}
+                                    style={styles.deleteButton}
+                                    textStyle={styles.deleteButtonText}
+                                    variant="danger"
+                                />
+                            </View>
+                        )}
                     </>
                 )}
             </View>
@@ -732,7 +737,6 @@ const styles = StyleSheet.create({
     // ── Review Grid ─────────────────────────────────────────────
     gridContent: {
         padding: 4,
-        paddingBottom: 160,
     },
     gridItemWrapper: {
         flex: 1 / 3,
@@ -787,33 +791,30 @@ const styles = StyleSheet.create({
     },
 
     // ── Footer ──────────────────────────────────────────────────
-    footer: {
+    deleteButtonContainer: {
         position: "absolute",
-        bottom: 24,
         left: 0,
         right: 0,
-        paddingTop: 20,
         paddingHorizontal: 20,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        backgroundColor: "transparent",
     },
-    deleteFooterButton: {
+    deleteButton: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "center",
         paddingVertical: 16,
         borderRadius: 14,
-        backgroundColor: "#ff3b30",
+        gap: 8,
         shadowColor: "#ff3b30",
         shadowOpacity: 0.4,
         shadowRadius: 12,
         shadowOffset: { width: 0, height: 0 },
-        borderWidth: 0,
+        elevation: 8,
     },
-    deleteFooterButtonText: {
+    deleteButtonText: {
         color: "#fff",
         fontSize: 16,
-        fontWeight: "bold",
+        fontWeight: "600",
     },
 
     // ── Empty State ─────────────────────────────────────────────

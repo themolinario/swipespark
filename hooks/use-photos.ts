@@ -33,7 +33,7 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
-  const { restoredPhotos, consumeRestoredPhotos, deletionPhotos } =
+  const { restoredPhotos, consumeRestoredPhotos, deletionPhotos, deletionVersion } =
     usePhotoStore();
 
   const endCursorRef = useRef<string | undefined>(undefined);
@@ -161,6 +161,21 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
       }
     }
   }, [restoredPhotos, consumeRestoredPhotos, photos, currentIndex]);
+
+  // When photos are permanently deleted elsewhere (delete tab, duplicates, smart clean),
+  // reload the photo list from scratch so index stays in sync.
+  const prevDeletionVersion = useRef(0);
+  useEffect(() => {
+    if (deletionVersion > prevDeletionVersion.current) {
+      prevDeletionVersion.current = deletionVersion;
+      if (hasPermission) {
+        setCurrentIndex(0);
+        endCursorRef.current = undefined;
+        hasNextPageRef.current = true;
+        fetchPhotos(true);
+      }
+    }
+  }, [deletionVersion, hasPermission, fetchPhotos]);
 
   useEffect(() => {
     if (!hasPermission) return;

@@ -8,6 +8,7 @@ import {
   PhotoAsset,
 } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
+import { useDuplicateStore } from "@/stores/duplicate-store";
 import { Check, Undo2, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
@@ -132,6 +133,13 @@ export default function DeletePhotosScreen() {
       const success = await mediaLibraryService.deleteAssets(ids);
 
       if (success) {
+        // Update duplicate store – remove deleted photos from duplicate groups
+        useDuplicateStore.getState().removeDuplicatesLocally(ids);
+        // Remove from kept list too (in case they were also kept)
+        usePhotoStore.getState().removePhotosPermanently(ids);
+        // Notify usePhotos (index) about permanent deletion
+        usePhotoStore.getState().bumpDeletionVersion();
+
         if (isSelectMode) {
           ids.forEach((id) => removeDeletionPhoto(id));
           setSelectedIds(new Set());
@@ -367,7 +375,7 @@ export default function DeletePhotosScreen() {
                 scrollEventThrottle={16}
                 contentContainerStyle={[
                   styles.listContent,
-                  { paddingBottom: tabBarHeight + 80 },
+                  { paddingBottom: tabBarHeight + 130 },
                 ]}
                 showsVerticalScrollIndicator={true}
                 scrollEnabled={!isScrollingDisabled}
@@ -378,7 +386,7 @@ export default function DeletePhotosScreen() {
           <View
             style={[
               styles.deleteButtonContainer,
-              { bottom: tabBarHeight + 40 },
+              { bottom: tabBarHeight + 52 },
             ]}
           >
             {isSelectMode && selectedIds.size > 0 ? (
@@ -577,11 +585,9 @@ const styles = StyleSheet.create({
   },
   deleteButtonContainer: {
     position: "absolute",
-    bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 20,
-    paddingTop: 16,
     backgroundColor: "transparent",
   },
   deleteButton: {
@@ -610,9 +616,9 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     borderRadius: 14,
-    gap: 6,
+    gap: 8,
     shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 0 },
     elevation: 8,
   },

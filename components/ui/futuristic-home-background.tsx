@@ -1,20 +1,10 @@
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect } from "react";
+import React from "react";
 import {
   StyleSheet,
   View,
   ViewProps,
 } from "react-native";
-import Animated,
-{
-  Easing,
-  interpolate,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withSequence,
-  withTiming,
-} from "react-native-reanimated";
 
 // ─── Main Component ─────────────────────────────────────────────
 export function FuturisticHomeBackground({
@@ -22,27 +12,6 @@ export function FuturisticHomeBackground({
   style,
   ...props
 }: ViewProps) {
-  const overlayPhase = useSharedValue(0);
-
-  useEffect(() => {
-    overlayPhase.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 10000, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 10000, easing: Easing.inOut(Easing.sin) })
-      ),
-      -1,
-      true
-    );
-  }, [overlayPhase]);
-
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(overlayPhase.value, [0, 1], [0.3, 0.65]),
-  }));
-
-  const vignetteStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(overlayPhase.value, [0, 1], [0.5, 0.7]),
-  }));
-
   return (
     <View style={[styles.container, style]} {...props}>
       {/* Base gradient */}
@@ -52,9 +21,9 @@ export function FuturisticHomeBackground({
         style={StyleSheet.absoluteFillObject}
       />
 
-      {/* Animated overlay gradient */}
-      <Animated.View
-        style={[StyleSheet.absoluteFillObject, overlayStyle]}
+      {/* Static overlay gradient */}
+      <View
+        style={[StyleSheet.absoluteFillObject, { opacity: 0.45 }]}
         pointerEvents="none"
       >
         <LinearGradient
@@ -67,12 +36,12 @@ export function FuturisticHomeBackground({
           end={{ x: 0.8, y: 1 }}
           style={StyleSheet.absoluteFillObject}
         />
-      </Animated.View>
+      </View>
 
       {/* Vignette */}
-      <Animated.View
+      <View
         pointerEvents="none"
-        style={[styles.vignette, vignetteStyle]}
+        style={[styles.vignette, { opacity: 0.6 }]}
       />
 
       {children}

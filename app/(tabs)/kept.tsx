@@ -303,7 +303,7 @@ export default function KeptPhotosScreen() {
                 scrollEventThrottle={16}
                 contentContainerStyle={[
                   styles.listContent,
-                  { paddingBottom: tabBarHeight + 80 },
+                  { paddingBottom: tabBarHeight + 130 },
                 ]}
                 showsVerticalScrollIndicator={true}
                 scrollEnabled={!isScrollingDisabled}
