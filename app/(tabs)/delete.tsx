@@ -1,4 +1,5 @@
 import { DeletionSuccessModal } from "@/components/deletion-success-modal";
+import { PhotoPreviewModal } from "@/components/photo-preview-modal";
 import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/ui/button";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
@@ -44,6 +45,8 @@ export default function DeletePhotosScreen() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
   const [isScrollingDisabled, setIsScrollingDisabled] = useState(false);
   const isDragging = useRef(false);
   const scrollOffset = useRef(0);
@@ -73,13 +76,8 @@ export default function DeletePhotosScreen() {
     });
   }, []);
 
-  const handleRemovePhoto = useCallback(
+  const handleRestorePhoto = useCallback(
     (photo: PhotoAsset) => {
-      if (isSelectMode) {
-        handleToggleSelect(photo.id);
-        return;
-      }
-
       Alert.alert(
         "Remove from list",
         "Do you want to restore this photo from the deletion list?",
@@ -93,7 +91,19 @@ export default function DeletePhotosScreen() {
         ],
       );
     },
-    [removeDeletionPhoto, isSelectMode, handleToggleSelect],
+    [removeDeletionPhoto],
+  );
+
+  const handlePhotoPress = useCallback(
+    (photo: PhotoAsset) => {
+      if (isSelectMode) {
+        handleToggleSelect(photo.id);
+        return;
+      }
+      const index = deletionPhotos.findIndex((p) => p.id === photo.id);
+      if (index >= 0) setPreviewIndex(index);
+    },
+    [isSelectMode, handleToggleSelect, deletionPhotos],
   );
 
   const toggleSelectMode = useCallback(() => {
@@ -280,7 +290,7 @@ export default function DeletePhotosScreen() {
               handleToggleSelect(item.id);
             }
           }}
-          onPress={() => handleRemovePhoto(item)}
+          onPress={() => handlePhotoPress(item)}
         >
           <View style={[styles.photoWrapper, isSelected && styles.photoWrapperSelected]}>
             <Image
@@ -295,14 +305,21 @@ export default function DeletePhotosScreen() {
               {isSelected && <Check size={14} color="#fff" />}
             </View>
           ) : (
-            <View style={styles.restoreIconContainer}>
+            <Pressable
+              style={styles.restoreIconContainer}
+              hitSlop={16}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleRestorePhoto(item);
+              }}
+            >
               <Undo2 size={18} color="#4ade80" />
-            </View>
+            </Pressable>
           )}
         </Pressable>
       );
     },
-    [handleRemovePhoto, isSelectMode, selectedIds, handleToggleSelect],
+    [handlePhotoPress, handleRestorePhoto, isSelectMode, selectedIds, handleToggleSelect],
   );
 
   const renderEmptyState = () => (
@@ -357,7 +374,7 @@ export default function DeletePhotosScreen() {
         renderEmptyState()
       ) : (
         <>
-          <ThemedText style={styles.hint}>Tap a photo to restore it</ThemedText>
+          <ThemedText style={styles.hint}>Tap to preview · Tap the restore icon to undo</ThemedText>
           <GestureDetector gesture={panGesture}>
             <View
               style={styles.listContainer}
@@ -369,6 +386,7 @@ export default function DeletePhotosScreen() {
                 renderItem={renderItem}
                 keyExtractor={(item) => item.id}
                 numColumns={COLUMN_COUNT}
+                extraData={[selectedIds, isSelectMode]}
                 onScroll={(e) => {
                   scrollOffset.current = e.nativeEvent.contentOffset.y;
                 }}
@@ -421,6 +439,46 @@ export default function DeletePhotosScreen() {
           </View>
         </>
       )}
+
+      <PhotoPreviewModal
+        visible={previewIndex !== null}
+        photos={deletionPhotos}
+        initialIndex={previewIndex ?? 0}
+        variant="delete"
+        onClose={() => setPreviewIndex(null)}
+        onRestore={(photo) => {
+          removeDeletionPhoto(photo.id);
+          setPreviewIndex(null);
+        }}
+        onDelete={(photo) => {
+          Alert.alert(
+            "Delete permanently",
+            "This photo will be permanently deleted from your device.",
+            [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Delete",
+                style: "destructive",
+                onPress: async () => {
+                  try {
+                    const ids = [photo.id];
+                    const success = await mediaLibraryService.deleteAssets(ids);
+                    if (success) {
+                      useDuplicateStore.getState().removeDuplicatesLocally(ids);
+                      usePhotoStore.getState().removePhotosPermanently(ids);
+                      usePhotoStore.getState().bumpDeletionVersion();
+                      removeDeletionPhoto(photo.id);
+                    }
+                  } catch {
+                    Alert.alert("Error", "Could not delete photo.");
+                  }
+                  setPreviewIndex(null);
+                },
+              },
+            ],
+          );
+        }}
+      />
 
       <DeletionSuccessModal
         visible={successModal.visible}
@@ -480,6 +538,7 @@ const styles = StyleSheet.create({
     width: ITEM_SIZE,
     height: ITEM_SIZE,
     margin: GAP / 2,
+    overflow: "visible",
   },
   photoWrapper: {
     flex: 1,
@@ -519,9 +578,10 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 40,
+    paddingTop: 80,
   },
   emptyIconGlow: {
     padding: 20,
@@ -560,6 +620,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.4)",
     justifyContent: "center",
     alignItems: "center",
+    zIndex: 10,
   },
   checkCircleSelected: {
     backgroundColor: "#ff6b6b",
@@ -568,7 +629,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.6,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 0 },
-    elevation: 6,
+    elevation: 10,
   },
   selectButton: {
     paddingHorizontal: 14,

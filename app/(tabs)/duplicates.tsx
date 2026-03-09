@@ -630,9 +630,10 @@ const styles = StyleSheet.create({
     },
     emptyContainer: {
         flex: 1,
-        justifyContent: "center",
+        justifyContent: "flex-start",
         alignItems: "center",
         paddingHorizontal: 40,
+        paddingTop: 80,
     },
     emptyIconGlow: {
         padding: 20,

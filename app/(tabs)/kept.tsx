@@ -1,3 +1,4 @@
+import { PhotoPreviewModal } from "@/components/photo-preview-modal";
 import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/ui/button";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
@@ -30,6 +31,7 @@ export default function KeptPhotosScreen() {
 
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const [isScrollingDisabled, setIsScrollingDisabled] = useState(false);
   const isDragging = useRef(false);
@@ -61,11 +63,6 @@ export default function KeptPhotosScreen() {
 
   const handleRemovePhoto = useCallback(
     (photo: PhotoAsset) => {
-      if (isSelectMode) {
-        handleToggleSelect(photo.id);
-        return;
-      }
-
       Alert.alert(
         "Remove from list",
         "Do you want to remove this photo from the keep list?",
@@ -79,7 +76,19 @@ export default function KeptPhotosScreen() {
         ],
       );
     },
-    [removeKeptPhoto, isSelectMode, handleToggleSelect],
+    [removeKeptPhoto],
+  );
+
+  const handlePhotoPress = useCallback(
+    (photo: PhotoAsset) => {
+      if (isSelectMode) {
+        handleToggleSelect(photo.id);
+        return;
+      }
+      const index = keptPhotos.findIndex((p) => p.id === photo.id);
+      if (index >= 0) setPreviewIndex(index);
+    },
+    [isSelectMode, handleToggleSelect, keptPhotos],
   );
 
   const toggleSelectMode = useCallback(() => {
@@ -204,7 +213,7 @@ export default function KeptPhotosScreen() {
               handleToggleSelect(item.id);
             }
           }}
-          onPress={() => handleRemovePhoto(item)}
+          onPress={() => handlePhotoPress(item)}
         >
           <View style={[styles.photoWrapper, isSelected && styles.photoWrapperSelected]}>
             <Image
@@ -219,14 +228,21 @@ export default function KeptPhotosScreen() {
               {isSelected && <Check size={14} color="#fff" />}
             </View>
           ) : (
-            <View style={styles.removeIconContainer}>
+            <Pressable
+              style={styles.removeIconContainer}
+              hitSlop={16}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleRemovePhoto(item);
+              }}
+            >
               <Undo2 size={18} color="#4ade80" />
-            </View>
+            </Pressable>
           )}
         </Pressable>
       );
     },
-    [handleRemovePhoto, isSelectMode, selectedIds, handleToggleSelect]
+    [handlePhotoPress, handleRemovePhoto, isSelectMode, selectedIds, handleToggleSelect]
   );
 
   const renderEmptyState = () => (
@@ -281,7 +297,7 @@ export default function KeptPhotosScreen() {
       ) : (
         <>
           <ThemedText style={styles.hint}>
-            Tap a photo to remove it from the list
+            Tap to preview · Tap the undo icon to remove
           </ThemedText>
           <GestureDetector gesture={panGesture}>
             <View
@@ -331,6 +347,18 @@ export default function KeptPhotosScreen() {
           )}
         </>
       )}
+
+      <PhotoPreviewModal
+        visible={previewIndex !== null}
+        photos={keptPhotos}
+        initialIndex={previewIndex ?? 0}
+        variant="kept"
+        onClose={() => setPreviewIndex(null)}
+        onRestore={(photo) => {
+          removeKeptPhoto(photo.id);
+          setPreviewIndex(null);
+        }}
+      />
     </FuturisticHomeBackground>
   );
 }
@@ -456,9 +484,10 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 40,
+    paddingTop: 80,
   },
   emptyIconGlow: {
     padding: 20,

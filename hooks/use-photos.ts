@@ -4,6 +4,7 @@ import {
 } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState, AppStateStatus } from "react-native";
 
 const PAGE_SIZE = 20;
 const PRELOAD_THRESHOLD = 5;
@@ -133,6 +134,30 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
   useEffect(() => {
     checkPermissionAndLoad();
   }, [checkPermissionAndLoad]);
+
+  // Re-fetch photos when the app returns to foreground (e.g. after taking photos with the camera)
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === "active" &&
+        hasPermission
+      ) {
+        console.log("App returned to foreground, refreshing photos...");
+        setCurrentIndex(0);
+        endCursorRef.current = undefined;
+        hasNextPageRef.current = true;
+        isFetchingRef.current = false;
+        fetchPhotos(true);
+      }
+      appStateRef.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [hasPermission, fetchPhotos]);
 
   useEffect(() => {
     if (restoredPhotos.length > 0) {

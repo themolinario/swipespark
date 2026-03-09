@@ -22,10 +22,10 @@ export const EmptyState = memo(function EmptyState() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     paddingHorizontal: 24,
-    paddingVertical: 20,
+    paddingTop: 80,
   },
   content: {
     alignItems: "center",

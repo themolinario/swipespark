@@ -10,7 +10,8 @@ import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
-import { Trash2 } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
+import { Trash2, Undo2 } from "lucide-react-native";
 import { useCallback, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -166,6 +167,21 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
         >
           <EmptyState />
+          {deletedCount > 0 && (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                handleUndo();
+              }}
+              style={({ pressed }) => [
+                styles.completeUndoButton,
+                pressed && { opacity: 0.7, transform: [{ scale: 0.96 }] },
+              ]}
+            >
+              <Undo2 size={20} color="#ffffff" style={{ marginRight: 8 }} />
+              <Text style={styles.completeUndoText}>Undo</Text>
+            </Pressable>
+          )}
         </ScrollView>
       ) : (
         <>
@@ -255,5 +271,23 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(255, 59, 48, 0.6)",
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 6,
+  },
+  completeUndoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 24,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+    borderRadius: 24,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.25)",
+  },
+  completeUndoText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });

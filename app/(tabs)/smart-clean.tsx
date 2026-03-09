@@ -820,8 +820,9 @@ const styles = StyleSheet.create({
     // ── Empty State ─────────────────────────────────────────────
     emptyState: {
         flex: 1,
-        justifyContent: "center",
+        justifyContent: "flex-start",
         alignItems: "center",
+        paddingTop: 80,
         gap: 16,
     },
     emptyIconGlow: {
