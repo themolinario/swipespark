@@ -1,8 +1,16 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedText } from "@/components/themed-text";
 import { FuturisticWelcomeBackground } from "@/components/ui/futuristic-welcome-background";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect } from "react";
+
+const ONBOARDING_KEY = "swipespark_onboarding_done";
+
+async function completeOnboarding() {
+  await AsyncStorage.setItem(ONBOARDING_KEY, "true");
+  router.replace("/(tabs)");
+}
 import { Image, Pressable, StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
@@ -75,7 +83,7 @@ export default function WelcomeScreen() {
 
         <Animated.View style={[styles.buttonWrapper, buttonAnimatedStyle]}>
           <Animated.View style={[styles.buttonGlowBackground, buttonGlowAnimatedStyle]} pointerEvents="none" />
-          <Pressable onPress={() => router.replace("/(tabs)")} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
+          <Pressable onPress={completeOnboarding} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
             <LinearGradient
               colors={["rgba(66, 245, 135, 0.18)", "rgba(33, 90, 58, 0.18)", "rgba(56, 224, 210, 0.12)"]}
               start={{ x: 0, y: 0 }}
