@@ -63,6 +63,8 @@ export default function DuplicatesScreen() {
     const currentTouchY = useRef<number>(0);
     const currentTouchX = useRef<number>(0);
 
+    const groupHeaderHeights = useRef<Map<string, number>>(new Map());
+
     useEffect(() => {
         if (duplicateGroups.length === 0 && !isScanning) {
             scanDuplicates();
@@ -128,7 +130,7 @@ export default function DuplicatesScreen() {
         const contentY = y + scrollOffset.current;
         if (contentY < 0) return null;
 
-        const relativeX = x - PADDING;
+        const relativeX = x - PADDING - GROUP_BORDER - GROUP_PADDING;
         if (relativeX < 0) return null;
 
         let currentY = 0;
@@ -137,28 +139,30 @@ export default function DuplicatesScreen() {
         for (let i = 0; i < duplicateGroups.length; i++) {
             const group = duplicateGroups[i];
 
-            const HEADER_HEIGHT = 48;
-            const GROUP_MB = 24;
-
-            const rows = Math.ceil(group.photos.length / 3);
+            const measuredHeaderH = groupHeaderHeights.current.get(group.id) ?? 39;
+            const headerSpaceH = measuredHeaderH + 10; // +10 = groupHeader marginBottom
+            const HEADER_OFFSET = GROUP_BORDER + GROUP_PADDING + headerSpaceH;
+            const rows = Math.ceil(group.photos.length / COLUMNS);
             const photosHeight = rows * (PHOTO_SIZE + GAP);
-            const groupHeight = HEADER_HEIGHT + photosHeight + GROUP_MB;
+            const groupHeight =
+                GROUP_BORDER * 2 + GROUP_PADDING * 2 + headerSpaceH + photosHeight + 24;
 
-            if (contentY >= currentY && contentY < currentY + groupHeight - GROUP_MB) {
+            const groupEnd = currentY + groupHeight - 24;
+
+            if (contentY >= currentY && contentY < groupEnd) {
                 const relativeY = contentY - currentY;
 
-                if (relativeY < HEADER_HEIGHT) {
+                if (relativeY < HEADER_OFFSET) {
                     return null;
                 }
 
-                const photoAreaY = relativeY - HEADER_HEIGHT;
+                const photoAreaY = relativeY - HEADER_OFFSET;
                 const row = Math.floor(photoAreaY / (PHOTO_SIZE + GAP));
                 const col = Math.floor(relativeX / (PHOTO_SIZE + GAP));
 
-                if (col >= 3) return null;
+                if (col < 0 || col >= COLUMNS) return null;
 
-                const indexInGroup = row * 3 + col;
-
+                const indexInGroup = row * COLUMNS + col;
                 if (indexInGroup >= 0 && indexInGroup < group.photos.length) {
                     return cumulativeIndex + indexInGroup;
                 }
@@ -282,7 +286,10 @@ export default function DuplicatesScreen() {
             const firstPhoto = item.photos[0];
             return (
                 <View style={styles.groupContainer}>
-                    <View style={styles.groupHeader}>
+                    <View
+                        style={styles.groupHeader}
+                        onLayout={(e) => groupHeaderHeights.current.set(item.id, e.nativeEvent.layout.height)}
+                    >
                         <View style={{ flex: 1 }}>
                             <ThemedText style={styles.groupTitle} numberOfLines={1}>
                                 {firstPhoto.filename}

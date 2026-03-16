@@ -72,6 +72,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     width: "100%",
     maxWidth: 320,
+    backgroundColor: "rgba(30, 30, 30, 0.92)",
   },
   title: {
     fontSize: 24,
@@ -103,6 +104,7 @@ const styles = StyleSheet.create({
   spaceValue: {
     fontSize: 36,
     fontWeight: "700",
+    lineHeight: 44,
   },
   closeButton: {
     backgroundColor: "#007aff",
