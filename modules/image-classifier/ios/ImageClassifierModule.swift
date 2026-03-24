@@ -1,25 +1,62 @@
 import ExpoModulesCore
 import Vision
-import CoreImage
 import Photos
+import UIKit
 
 public class ImageClassifierModule: Module {
 
-  private func classifySingleImage(url: URL) -> [[String: Any]] {
-    guard let ciImage = CIImage(contentsOf: url) else {
-      return []
+  private func extractLocalIdentifier(from uriString: String) -> String? {
+    if uriString.hasPrefix("ph://") {
+      return String(uriString.dropFirst(5))
     }
 
-    let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
+    guard let url = URL(string: uriString),
+          url.scheme == "assets-library" || url.scheme == "asset-library",
+          let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          let idParam = components.queryItems?.first(where: { $0.name == "id" }) else {
+      return nil
+    }
+    return idParam.value
+  }
+
+  private func loadCGImage(from uriString: String) -> CGImage? {
+    if let localIdentifier = extractLocalIdentifier(from: uriString) {
+      let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+      guard let asset = fetchResult.firstObject else { return nil }
+
+      let options = PHImageRequestOptions()
+      options.isSynchronous = true
+      options.deliveryMode = .highQualityFormat
+      options.isNetworkAccessAllowed = true
+      options.resizeMode = .fast
+
+      var cgImage: CGImage? = nil
+      PHImageManager.default().requestImage(
+        for: asset,
+        targetSize: CGSize(width: 512, height: 512),
+        contentMode: .aspectFit,
+        options: options
+      ) { image, _ in
+        cgImage = image?.cgImage
+      }
+      return cgImage
+    }
+
+    guard let url = URL(string: uriString),
+          let data = try? Data(contentsOf: url),
+          let uiImage = UIImage(data: data) else { return nil }
+    return uiImage.cgImage
+  }
+
+  private func classifySingleImage(_ uriString: String) -> [[String: Any]] {
+    guard let cgImage = loadCGImage(from: uriString) else { return [] }
+
+    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
     var resultLabels: [[String: Any]] = []
-    let semaphore = DispatchSemaphore(value: 0)
 
     let request = VNClassifyImageRequest { request, error in
-      defer { semaphore.signal() }
       guard error == nil,
-            let observations = request.results as? [VNClassificationObservation] else {
-        return
-      }
+            let observations = request.results as? [VNClassificationObservation] else { return }
       resultLabels = observations
         .filter { $0.confidence > 0.3 }
         .prefix(10)
@@ -28,10 +65,7 @@ public class ImageClassifierModule: Module {
 
     do {
       try handler.perform([request])
-      semaphore.wait()
-    } catch {
-      // classification failed, return empty
-    }
+    } catch { }
 
     return resultLabels
   }
@@ -40,35 +74,10 @@ public class ImageClassifierModule: Module {
     Name("ImageClassifier")
 
     AsyncFunction("classifyImage") { (uriString: String, promise: Promise) in
-      guard let url = URL(string: uriString),
-            let ciImage = CIImage(contentsOf: url) else {
-        promise.reject("INVALID_URI", "Cannot read image at URI")
-        return
-      }
-
-      let handler = VNImageRequestHandler(ciImage: ciImage, options: [:])
-      let request = VNClassifyImageRequest { request, error in
-        if let error = error {
-          promise.reject("CLASSIFY_ERROR", error.localizedDescription)
-          return
-        }
-
-        guard let observations = request.results as? [VNClassificationObservation] else {
-          promise.resolve([])
-          return
-        }
-
-        let labels = observations
-          .filter { $0.confidence > 0.3 }
-          .map { $0.identifier }
-
-        promise.resolve(labels)
-      }
-
-      do {
-        try handler.perform([request])
-      } catch {
-        promise.reject("PERFORM_ERROR", error.localizedDescription)
+      DispatchQueue.global(qos: .userInitiated).async {
+        let labels = self.classifySingleImage(uriString)
+        let identifiers = labels.compactMap { $0["identifier"] as? String }
+        promise.resolve(identifiers)
       }
     }
 
@@ -90,15 +99,7 @@ public class ImageClassifierModule: Module {
               group.leave()
             }
 
-            guard let url = URL(string: uriString) else {
-              let entry: [String: Any] = ["uri": uriString, "labels": [] as [[String: Any]]]
-              lock.lock()
-              results[index] = entry
-              lock.unlock()
-              return
-            }
-
-            let labels = self.classifySingleImage(url: url)
+            let labels = self.classifySingleImage(uriString)
             let entry: [String: Any] = ["uri": uriString, "labels": labels]
             lock.lock()
             results[index] = entry
@@ -115,43 +116,23 @@ public class ImageClassifierModule: Module {
       var totalSize: Double = 0
 
       for uriString in uriStrings {
-        guard let url = URL(string: uriString) else { continue }
-
-        // Estrai il localIdentifier dall'URI ph:// o asset-library://
-        var localIdentifier: String? = nil
-
-        if url.scheme == "ph" {
-          // formato: ph://XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
-          localIdentifier = url.host
-        } else if url.scheme == "assets-library" || url.scheme == "asset-library" {
-          // formato: assets-library://asset/asset.JPG?id=XXXXXXXX-...&ext=JPG
-          if let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-             let idParam = components.queryItems?.first(where: { $0.name == "id" }) {
-            localIdentifier = idParam.value
-          }
-        }
-
-        if let identifier = localIdentifier {
-          let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [identifier], options: nil)
+        if let localIdentifier = self.extractLocalIdentifier(from: uriString) {
+          let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
           if let asset = fetchResult.firstObject {
             let resources = PHAssetResource.assetResources(for: asset)
-            // Prendi la risorsa principale (foto originale)
             let primaryResource = resources.first(where: { $0.type == .photo }) ?? resources.first
             if let resource = primaryResource,
                let fileSize = resource.value(forKey: "fileSize") as? Int64 {
               totalSize += Double(fileSize)
             }
           }
-        } else {
-          // fallback per URI file://
+        } else if let url = URL(string: uriString) {
           do {
             let resources = try url.resourceValues(forKeys: [.fileSizeKey])
             if let fileSize = resources.fileSize {
               totalSize += Double(fileSize)
             }
-          } catch {
-            print("Error getting size for \(uriString): \(error.localizedDescription)")
-          }
+          } catch { }
         }
       }
 
@@ -162,7 +143,6 @@ public class ImageClassifierModule: Module {
       var totalSize: Double = 0
 
       let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
-
       fetchResult.enumerateObjects { (asset, _, _) in
         let resources = PHAssetResource.assetResources(for: asset)
         let primaryResource = resources.first(where: { $0.type == .photo }) ?? resources.first

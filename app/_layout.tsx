@@ -1,3 +1,4 @@
+import "@/i18n";
 import { GradientBackground } from "@/components/ui/gradient-background";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {

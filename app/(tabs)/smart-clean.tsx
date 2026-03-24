@@ -1,48 +1,59 @@
 import { AnimatedScanner } from "@/components/ui/animated-scanner";
 import { Button } from "@/components/ui/button";
+import { PhotoPreviewModal } from "@/components/photo-preview-modal";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { classifyImages } from "@/modules/image-classifier";
 import { useClassificationCache, CachedLabel } from "@/stores/classification-cache";
 import { usePhotoStore } from "@/stores/photo-store";
+import { PhotoAsset } from "@/services/media-library.service";
 import { mapLabelsToCategory, matchesCustomQuery, SmartCategory, LabelWithConfidence } from "@/utils/category-mapper";
-import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, CheckCircle, Circle, Wand2, X, Trash2 } from "lucide-react-native";
+import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, Check, Wand2, X, Trash2 } from "lucide-react-native";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import * as MediaLibrary from "expo-media-library";
 import { router } from "expo-router";
 import { useState, useRef, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
+    ActivityIndicator,
+    Dimensions,
     FlatList,
     Pressable,
     ScrollView,
     StyleSheet,
     Text,
     TextInput,
-    TouchableOpacity,
     View
 } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
 type WizardStep = "SELECT_CATEGORY" | "ENTER_CUSTOM_QUERY" | "SCANNING" | "REVIEW_RESULTS";
 
-const CATEGORIES: { label: SmartCategory; Icon: any }[] = [
-    { label: "People", Icon: Users },
-    { label: "Landscapes", Icon: ImageIcon },
-    { label: "Documents", Icon: FileText },
-    { label: "Animals", Icon: PawPrint },
-    { label: "Food", Icon: Utensils },
-    { label: "Vehicles", Icon: Car },
-    { label: "Interiors", Icon: Home },
-    { label: "Custom", Icon: Search },
+type CategoryLabelKey = "smart.categoryPeople" | "smart.categoryLandscapes" | "smart.categoryDocuments" | "smart.categoryAnimals" | "smart.categoryFood" | "smart.categoryVehicles" | "smart.categoryInteriors" | "smart.categoryCustom";
+
+const CATEGORIES: { label: SmartCategory; labelKey: CategoryLabelKey; Icon: any }[] = [
+    { label: "People", labelKey: "smart.categoryPeople", Icon: Users },
+    { label: "Landscapes", labelKey: "smart.categoryLandscapes", Icon: ImageIcon },
+    { label: "Documents", labelKey: "smart.categoryDocuments", Icon: FileText },
+    { label: "Animals", labelKey: "smart.categoryAnimals", Icon: PawPrint },
+    { label: "Food", labelKey: "smart.categoryFood", Icon: Utensils },
+    { label: "Vehicles", labelKey: "smart.categoryVehicles", Icon: Car },
+    { label: "Interiors", labelKey: "smart.categoryInteriors", Icon: Home },
+    { label: "Custom", labelKey: "smart.categoryCustom", Icon: Search },
 ];
 
-// Fetch 500 assets per page from MediaLibrary for fast iteration
 const FETCH_PAGE_SIZE = 500;
-// Send 50 images per native batch classification call
 const NATIVE_BATCH_SIZE = 50;
+const DISPLAY_BATCH_SIZE = 15;
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const COLUMN_COUNT = 3;
+const GAP = 3;
+const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 
 export default function SmartCleanScreen() {
+    const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const tabBarHeight = useBottomTabBarHeight();
 
@@ -54,114 +65,106 @@ export default function SmartCleanScreen() {
     const [scanStatusText, setScanStatusText] = useState("");
     const [matchedPhotos, setMatchedPhotos] = useState<MediaLibrary.Asset[]>([]);
     const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
-    const [isScanningInBackground, setIsScanningInBackground] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [scanComplete, setScanComplete] = useState(false);
+
+    const [isSelectMode, setIsSelectMode] = useState(false);
+    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+    const [isScrollingDisabled, setIsScrollingDisabled] = useState(false);
 
     const addDeletionPhoto = usePhotoStore((state) => state.addDeletionPhoto);
     const isPhotoKept = usePhotoStore((state) => state.isPhotoKept);
     const isPhotoMarkedForDeletion = usePhotoStore((state) => state.isPhotoMarkedForDeletion);
 
-    // Cache store accessors
     const getCachedLabels = useClassificationCache((s) => s.getCachedLabels);
     const setCachedLabelsBatch = useClassificationCache((s) => s.setCachedLabelsBatch);
 
-    // Abort scan ref
-    const abortRef = useRef(false);
+    const scanIdRef = useRef(0);
+    const endCursorRef = useRef<string | undefined>(undefined);
+    const hasNextPageRef = useRef(true);
+    const totalProcessedRef = useRef(0);
+    const totalAssetsEstimateRef = useRef(0);
+    const categoryRef = useRef<SmartCategory | null>(null);
+    const customQueryRef = useRef("");
 
-    const startScan = async (category: SmartCategory) => {
-        setSelectedCategory(category);
+    const isDragging = useRef(false);
+    const scrollOffset = useRef(0);
+    const startDragIndex = useRef<number | null>(null);
+    const lastToggledIndex = useRef<number | null>(null);
+    const isSelectingRef = useRef(true);
+    const flatListRef = useRef<FlatList>(null);
+    const listContainerRef = useRef<View>(null);
+    const scrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+    const currentTouchY = useRef(0);
+    const currentTouchX = useRef(0);
+    const listStartY = useRef(0);
+
+    const checkMatch = useCallback((category: SmartCategory, labels: LabelWithConfidence[]): boolean => {
         if (category === "Custom") {
-            setStep("ENTER_CUSTOM_QUERY");
-        } else {
-            await runScan(category);
+            return matchesCustomQuery(labels, customQueryRef.current);
         }
-    };
-
-    const cancelScan = useCallback(() => {
-        abortRef.current = true;
+        const result = mapLabelsToCategory(labels);
+        return result.category === category;
     }, []);
 
-    const runScan = async (category: SmartCategory) => {
-        setStep("SCANNING");
-        setProgress(0);
-        setScanStatusText("Requesting permissions...");
-        setMatchedPhotos([]);
-        setSelectedForDeletion(new Set());
-        setIsScanningInBackground(false);
-        abortRef.current = false;
+    const loadNextBatch = useCallback(async (category: SmartCategory, scanId: number) => {
+        if (!hasNextPageRef.current || scanId !== scanIdRef.current) return;
+
+        setIsLoadingMore(true);
+        const newlyFound: MediaLibrary.Asset[] = [];
+        const totalEstimate = totalAssetsEstimateRef.current;
 
         try {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (status !== "granted") {
-                setStep("SELECT_CATEGORY");
-                return;
-            }
-
-            // Clear expired cache entries on scan start
-            useClassificationCache.getState().clearExpired();
-
-            let hasNextPage = true;
-            let endCursor: string | undefined = undefined;
-            const found: MediaLibrary.Asset[] = [];
-            let totalProcessed = 0;
-
-            // Get total count for progress
-            const initialPage = await MediaLibrary.getAssetsAsync({ first: 1, mediaType: "photo" });
-            const totalAssetsEstimate = initialPage.totalCount;
-
-            setScanStatusText(`Scanning ${totalAssetsEstimate} photos...`);
-
-            while (hasNextPage && !abortRef.current) {
+            while (hasNextPageRef.current && scanId === scanIdRef.current) {
                 const page = await MediaLibrary.getAssetsAsync({
                     first: FETCH_PAGE_SIZE,
-                    after: endCursor,
+                    after: endCursorRef.current,
                     mediaType: "photo",
                     sortBy: ["modificationTime"],
                 });
 
-                // Filter out already-processed photos and tiny images
+                if (scanId !== scanIdRef.current) break;
+
                 const validAssets = page.assets.filter(asset => {
                     if (isPhotoKept(asset.id) || isPhotoMarkedForDeletion(asset.id)) {
-                        totalProcessed++;
+                        totalProcessedRef.current++;
                         return false;
                     }
                     if (asset.width < 300 || asset.height < 300) {
-                        totalProcessed++;
+                        totalProcessedRef.current++;
                         return false;
                     }
                     return true;
                 });
 
-                // Split into: cached (instant) and uncached (need native classification)
                 const cachedAssets: { asset: MediaLibrary.Asset; labels: LabelWithConfidence[] }[] = [];
                 const uncachedAssets: MediaLibrary.Asset[] = [];
 
                 for (const asset of validAssets) {
                     const cached = getCachedLabels(asset.id);
-                    if (cached) {
+                    if (cached && cached.length > 0) {
                         cachedAssets.push({ asset, labels: cached });
                     } else {
                         uncachedAssets.push(asset);
                     }
                 }
 
-                // Process cached assets immediately (zero cost)
                 for (const { asset, labels } of cachedAssets) {
-                    totalProcessed++;
-                    const isMatch = checkMatch(category, labels);
-                    if (isMatch) {
-                        found.push(asset);
+                    totalProcessedRef.current++;
+                    if (checkMatch(category, labels)) {
+                        newlyFound.push(asset);
                     }
                 }
 
-                // Process uncached assets in native batches
-                for (let i = 0; i < uncachedAssets.length && !abortRef.current; i += NATIVE_BATCH_SIZE) {
+                for (let i = 0; i < uncachedAssets.length && scanId === scanIdRef.current; i += NATIVE_BATCH_SIZE) {
                     const batch = uncachedAssets.slice(i, i + NATIVE_BATCH_SIZE);
                     const uris = batch.map(a => a.uri);
 
                     try {
                         const results = await classifyImages(uris);
 
-                        // Cache results and check matches
+                        if (scanId !== scanIdRef.current) break;
+
                         const cacheEntries: { assetId: string; labels: CachedLabel[] }[] = [];
 
                         for (let j = 0; j < results.length; j++) {
@@ -174,107 +177,300 @@ export default function SmartCleanScreen() {
                                 confidence: l.confidence,
                             }));
 
-                            // Prepare cache entry
-                            cacheEntries.push({ assetId: asset.id, labels });
-
-                            // Check match
-                            const isMatch = checkMatch(category, labels);
-                            if (isMatch) {
-                                found.push(asset);
+                            if (labels.length > 0) {
+                                cacheEntries.push({ assetId: asset.id, labels });
                             }
 
-                            totalProcessed++;
+                            if (checkMatch(category, labels)) {
+                                newlyFound.push(asset);
+                            }
+
+                            totalProcessedRef.current++;
                         }
 
-                        // Batch cache update
                         if (cacheEntries.length > 0) {
                             setCachedLabelsBatch(cacheEntries);
                         }
                     } catch (e) {
-                        console.warn("Batch classification failed, skipping batch:", e);
-                        totalProcessed += batch.length;
+                        console.error("[SmartClean] Batch classification FAILED:", e);
+                        totalProcessedRef.current += batch.length;
                     }
 
-                    // Update progress
-                    const progressPct = Math.min((totalProcessed / totalAssetsEstimate) * 100, 99);
+                    if (scanId !== scanIdRef.current) break;
+
+                    const progressPct = Math.min((totalProcessedRef.current / totalEstimate) * 100, 99);
                     setProgress(progressPct);
-                    setScanStatusText(`${totalProcessed} / ${totalAssetsEstimate} photos • ${found.length} found`);
+                    setScanStatusText(t("smart.scanProgress", { processed: totalProcessedRef.current, total: totalEstimate, found: newlyFound.length }));
 
-                    // Update matched photos incrementally for live preview
-                    if (found.length > 0) {
-                        setMatchedPhotos([...found]);
-                    }
-
-                    // Yield to JS thread
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
 
-                // If we have enough results and user might want to review, switch to review mode
-                // but keep scanning in background
-                if (found.length >= 20 && step !== "REVIEW_RESULTS" && !isScanningInBackground) {
-                    setMatchedPhotos([...found]);
-                    const newSelected = new Set<string>();
-                    found.forEach(p => newSelected.add(p.id));
-                    setSelectedForDeletion(newSelected);
-                    setIsScanningInBackground(true);
-                    setStep("REVIEW_RESULTS");
-                }
+                hasNextPageRef.current = page.hasNextPage;
+                endCursorRef.current = page.endCursor;
 
-                hasNextPage = page.hasNextPage;
-                endCursor = page.endCursor;
+                if (newlyFound.length >= DISPLAY_BATCH_SIZE || !hasNextPageRef.current) {
+                    break;
+                }
             }
 
-            setProgress(100);
-            setScanStatusText(`Done! ${found.length} photos found.`);
-            setMatchedPhotos([...found]);
+            if (scanId !== scanIdRef.current) return;
 
-            const newSelected = new Set<string>();
-            found.forEach((p: MediaLibrary.Asset) => newSelected.add(p.id));
-            setSelectedForDeletion(newSelected);
+            if (!hasNextPageRef.current) {
+                setScanComplete(true);
+                setProgress(100);
+            }
+
+            setMatchedPhotos(prev => [...prev, ...newlyFound]);
+            setStep("REVIEW_RESULTS");
 
         } catch (e) {
             console.error("Scan error:", e);
+            if (scanId === scanIdRef.current) setStep("REVIEW_RESULTS");
         } finally {
-            setIsScanningInBackground(false);
-            if (step !== "REVIEW_RESULTS") {
-                setStep("REVIEW_RESULTS");
+            if (scanId === scanIdRef.current) setIsLoadingMore(false);
+        }
+    }, [checkMatch, getCachedLabels, setCachedLabelsBatch, isPhotoKept, isPhotoMarkedForDeletion]);
+
+    const cancelScan = useCallback(() => {
+        scanIdRef.current += 1;
+    }, []);
+
+    const runScan = async (category: SmartCategory) => {
+        scanIdRef.current += 1;
+        const scanId = scanIdRef.current;
+
+        setStep("SCANNING");
+        setProgress(0);
+        setScanStatusText(t("smart.requestingPermissions"));
+        setMatchedPhotos([]);
+        setSelectedForDeletion(new Set());
+        setScanComplete(false);
+        setIsSelectMode(false);
+
+        endCursorRef.current = undefined;
+        hasNextPageRef.current = true;
+        totalProcessedRef.current = 0;
+        totalAssetsEstimateRef.current = 0;
+        categoryRef.current = category;
+        customQueryRef.current = customQuery;
+
+        try {
+            const { status } = await MediaLibrary.requestPermissionsAsync();
+            if (scanId !== scanIdRef.current) return;
+            if (status !== "granted") {
+                setStep("SELECT_CATEGORY");
+                return;
             }
+
+            useClassificationCache.getState().clearAll();
+
+            const initialPage = await MediaLibrary.getAssetsAsync({ first: 1, mediaType: "photo" });
+            if (scanId !== scanIdRef.current) return;
+
+            totalAssetsEstimateRef.current = initialPage.totalCount;
+            setScanStatusText(t("smart.scanningPhotos", { count: initialPage.totalCount }));
+
+            await loadNextBatch(category, scanId);
+        } catch (e) {
+            console.error("Scan error:", e);
+            if (scanId === scanIdRef.current) setStep("REVIEW_RESULTS");
         }
     };
 
-    const checkMatch = (category: SmartCategory, labels: LabelWithConfidence[]): boolean => {
+    const startScan = async (category: SmartCategory) => {
+        setSelectedCategory(category);
         if (category === "Custom") {
-            return matchesCustomQuery(labels, customQuery);
-        }
-        const result = mapLabelsToCategory(labels);
-        return result.category === category;
-    };
-
-    const toggleSelection = (id: string) => {
-        const newSelected = new Set(selectedForDeletion);
-        if (newSelected.has(id)) {
-            newSelected.delete(id);
+            setStep("ENTER_CUSTOM_QUERY");
         } else {
-            newSelected.add(id);
+            await runScan(category);
         }
-        setSelectedForDeletion(newSelected);
     };
 
-    const confirmDeletion = () => {
-        // Stop background scan if still running
-        abortRef.current = true;
+    const handleEndReached = useCallback(() => {
+        if (!isLoadingMore && !scanComplete && categoryRef.current) {
+            loadNextBatch(categoryRef.current, scanIdRef.current);
+        }
+    }, [isLoadingMore, scanComplete, loadNextBatch]);
 
-        const photosToDelete = matchedPhotos.filter(p => selectedForDeletion.has(p.id));
-        photosToDelete.forEach(p => {
-            addDeletionPhoto(p);
+    const toggleSelectMode = useCallback(() => {
+        setIsSelectMode(prev => !prev);
+        setSelectedForDeletion(new Set());
+    }, []);
+
+    const handleSelectAll = useCallback(() => {
+        if (selectedForDeletion.size === matchedPhotos.length) {
+            setSelectedForDeletion(new Set());
+        } else {
+            setSelectedForDeletion(new Set(matchedPhotos.map(p => p.id)));
+        }
+    }, [selectedForDeletion.size, matchedPhotos]);
+
+    const handleToggleSelect = useCallback((id: string) => {
+        setSelectedForDeletion(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
         });
+    }, []);
 
+    const getIndexFromCoordinates = useCallback((x: number, y: number) => {
+        const contentY = y + scrollOffset.current;
+        if (contentY < 0) return null;
+        const relativeX = x - GAP;
+        if (relativeX < 0) return null;
+        const row = Math.floor(contentY / (ITEM_SIZE + GAP));
+        const col = Math.floor(relativeX / (ITEM_SIZE + GAP));
+        if (col >= COLUMN_COUNT) return null;
+        const index = row * COLUMN_COUNT + col;
+        return index >= 0 && index < matchedPhotos.length ? index : null;
+    }, [matchedPhotos.length]);
+
+    const handleDragStart = useCallback((x: number, y: number) => {
+        isDragging.current = true;
+        setIsScrollingDisabled(true);
+        const index = getIndexFromCoordinates(x, y);
+        if (index !== null) {
+            startDragIndex.current = index;
+            lastToggledIndex.current = index;
+            const photo = matchedPhotos[index];
+            setSelectedForDeletion(prev => {
+                const next = new Set(prev);
+                if (next.has(photo.id)) {
+                    next.delete(photo.id);
+                    isSelectingRef.current = false;
+                } else {
+                    next.add(photo.id);
+                    isSelectingRef.current = true;
+                }
+                return next;
+            });
+        }
+    }, [getIndexFromCoordinates, matchedPhotos]);
+
+    const handleDragUpdate = useCallback((x: number, y: number) => {
+        if (!isDragging.current) return;
+        currentTouchX.current = x;
+        currentTouchY.current = y;
+        const currentIndex = getIndexFromCoordinates(x, y);
+        if (currentIndex !== null && currentIndex !== lastToggledIndex.current && startDragIndex.current !== null) {
+            const minIdx = Math.min(startDragIndex.current, currentIndex);
+            const maxIdx = Math.max(startDragIndex.current, currentIndex);
+            setSelectedForDeletion(prev => {
+                const next = new Set(prev);
+                for (let i = minIdx; i <= maxIdx; i++) {
+                    const p = matchedPhotos[i];
+                    if (p) {
+                        if (isSelectingRef.current) next.add(p.id);
+                        else next.delete(p.id);
+                    }
+                }
+                return next;
+            });
+            lastToggledIndex.current = currentIndex;
+        }
+    }, [getIndexFromCoordinates, matchedPhotos]);
+
+    const handleDragEnd = useCallback(() => {
+        isDragging.current = false;
+        setIsScrollingDisabled(false);
+        startDragIndex.current = null;
+        lastToggledIndex.current = null;
+        if (scrollTimer.current) {
+            clearInterval(scrollTimer.current);
+            scrollTimer.current = null;
+        }
+    }, []);
+
+    const autoScroll = useCallback(() => {
+        if (!isDragging.current || !flatListRef.current) return;
+        const y = currentTouchY.current;
+        const x = currentTouchX.current;
+        const SCROLL_ZONE = 80;
+        const SCROLL_SPEED = 15;
+        const listHeight = Dimensions.get("window").height - listStartY.current - insets.top;
+        if (y < SCROLL_ZONE) {
+            const newOffset = Math.max(0, scrollOffset.current - SCROLL_SPEED);
+            flatListRef.current.scrollToOffset({ offset: newOffset, animated: false });
+            handleDragUpdate(x, y - SCROLL_SPEED);
+        } else if (y > listHeight - SCROLL_ZONE) {
+            const newOffset = scrollOffset.current + SCROLL_SPEED;
+            flatListRef.current.scrollToOffset({ offset: newOffset, animated: false });
+            handleDragUpdate(x, y + SCROLL_SPEED);
+        }
+    }, [handleDragUpdate, insets.top]);
+
+    const panGesture = Gesture.Pan()
+        .enabled(isSelectMode)
+        .activeOffsetX([-10, 10])
+        .failOffsetY([-20, 20])
+        .runOnJS(true)
+        .onStart((e) => {
+            handleDragStart(e.x, e.y);
+            if (!scrollTimer.current) {
+                scrollTimer.current = setInterval(autoScroll, 16);
+            }
+        })
+        .onUpdate((e) => handleDragUpdate(e.x, e.y))
+        .onEnd(() => handleDragEnd())
+        .onFinalize(() => handleDragEnd());
+
+    const confirmDeletion = useCallback(() => {
+        scanIdRef.current += 1;
+        const photosToDelete = matchedPhotos.filter(p => selectedForDeletion.has(p.id));
+        photosToDelete.forEach(p => addDeletionPhoto(p as unknown as PhotoAsset));
         setStep("SELECT_CATEGORY");
         setMatchedPhotos([]);
         setSelectedForDeletion(new Set());
-
+        setIsSelectMode(false);
         router.push("/delete");
-    };
+    }, [matchedPhotos, selectedForDeletion, addDeletionPhoto]);
+
+    const renderListFooter = useCallback(() => {
+        if (!isLoadingMore) return null;
+        return (
+            <View style={styles.loadingFooter}>
+                <ActivityIndicator color="#4ade80" size="small" />
+                <Text style={styles.loadingFooterText}>{t("smart.searchingMore")}</Text>
+            </View>
+        );
+    }, [isLoadingMore]);
+
+    const renderItem = useCallback(({ item, index }: { item: MediaLibrary.Asset; index: number }) => {
+        const isSelected = selectedForDeletion.has(item.id);
+        return (
+            <Pressable
+                style={styles.gridItemWrapper}
+                onLongPress={() => {
+                    if (!isSelectMode) {
+                        setIsSelectMode(true);
+                        handleToggleSelect(item.id);
+                    }
+                }}
+                onPress={() => {
+                    if (isSelectMode) {
+                        handleToggleSelect(item.id);
+                    } else {
+                        setPreviewIndex(index);
+                    }
+                }}
+            >
+                <View style={[styles.gridImageWrapper, isSelected && styles.gridImageWrapperSelected]}>
+                    <Image
+                        source={{ uri: item.uri }}
+                        style={[styles.gridImage, isSelected && styles.gridImageSelected]}
+                        contentFit="cover"
+                        transition={200}
+                    />
+                </View>
+                {isSelectMode && (
+                    <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
+                        {isSelected && <Check size={14} color="#fff" />}
+                    </View>
+                )}
+            </Pressable>
+        );
+    }, [isSelectMode, selectedForDeletion, handleToggleSelect]);
 
     // ─── SELECT CATEGORY ────────────────────────────────────────
     if (step === "SELECT_CATEGORY") {
@@ -290,20 +486,14 @@ export default function SmartCleanScreen() {
                             <View style={styles.headerIconGlow}>
                                 <Wand2 size={24} color="#4ade80" />
                             </View>
-                            <Text style={styles.title} numberOfLines={2}>Smart Cleanup</Text>
+                            <Text style={styles.title} numberOfLines={2}>{t("smart.title")}</Text>
                         </View>
                         <Text style={styles.subtitle} numberOfLines={3}>
-                            Choose a category to automatically find and clean up photos.
+                            {t("smart.subtitle")}
                         </Text>
                     </View>
 
-                    {/* Neon separator */}
-                    <LinearGradient
-                        colors={["rgba(74,222,128,0)", "rgba(74,222,128,0.4)", "rgba(74,222,128,0)"]}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={styles.separator}
-                    />
+                    <View style={[styles.separator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.4), rgba(74,222,128,0))' }]} />
 
                     <View style={styles.categoryGrid}>
                         {CATEGORIES.map((cat) => (
@@ -318,7 +508,7 @@ export default function SmartCleanScreen() {
                                 <View style={styles.categoryIconWrapper}>
                                     <cat.Icon size={32} color="#4ade80" />
                                 </View>
-                                <Text style={styles.categoryLabel}>{cat.label}</Text>
+                                <Text style={styles.categoryLabel}>{t(cat.labelKey)}</Text>
                             </Pressable>
                         ))}
                     </View>
@@ -337,24 +527,19 @@ export default function SmartCleanScreen() {
                             <ArrowLeft size={22} color="#4ade80" />
                         </Pressable>
                         <View style={{ flex: 1 }}>
-                            <Text style={styles.title} numberOfLines={2}>Custom Search</Text>
+                            <Text style={styles.title} numberOfLines={2}>{t("smart.customSearchTitle")}</Text>
                             <Text style={styles.subtitle} numberOfLines={3}>
-                                Describe what you want to find (e.g. &quot;Pizza&quot;, &quot;Sunset&quot;, &quot;Car&quot;).
+                                {t("smart.customSearchSubtitle")}
                             </Text>
                         </View>
                     </View>
 
-                    <LinearGradient
-                        colors={["rgba(74,222,128,0)", "rgba(74,222,128,0.4)", "rgba(74,222,128,0)"]}
-                        start={{ x: 0, y: 0.5 }}
-                        end={{ x: 1, y: 0.5 }}
-                        style={styles.separator}
-                    />
+                    <View style={[styles.separator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.4), rgba(74,222,128,0))' }]} />
 
                     <View style={styles.customQueryContainer}>
                         <TextInput
                             style={styles.textInput}
-                            placeholder="Enter a keyword..."
+                            placeholder={t("smart.enterKeyword")}
                             placeholderTextColor="rgba(255,255,255,0.3)"
                             value={customQuery}
                             onChangeText={setCustomQuery}
@@ -371,7 +556,7 @@ export default function SmartCleanScreen() {
                             onPress={() => runScan("Custom")}
                         >
                             <Search size={18} color="#fff" />
-                            <Text style={styles.primaryButtonText}>Search</Text>
+                            <Text style={styles.primaryButtonText}>{t("smart.search")}</Text>
                         </Pressable>
                     </View>
                 </View>
@@ -387,22 +572,19 @@ export default function SmartCleanScreen() {
                     <AnimatedScanner color="#4ade80" />
                 </View>
                 <Text style={styles.scanningTitle}>
-                    Scanning for {selectedCategory === "Custom" ? `"${customQuery}"` : selectedCategory}...
+                    {selectedCategory === "Custom"
+                        ? t("smart.scanningForCustom", { query: customQuery })
+                        : t("smart.scanningFor", { category: t(CATEGORIES.find(c => c.label === selectedCategory)?.labelKey as CategoryLabelKey) })}
                 </Text>
                 <Text style={styles.scanningSubtitle}>
-                    {Math.round(progress)}% complete
+                    {t("smart.percentComplete", { percent: Math.round(progress) })}
                 </Text>
                 {scanStatusText ? (
                     <Text style={styles.scanningDetail}>{scanStatusText}</Text>
                 ) : null}
                 {progress > 0 && progress < 100 && (
                     <View style={styles.progressBarContainer}>
-                        <LinearGradient
-                            colors={["#4ade80", "#38E0D2", "#2dd4bf"]}
-                            start={{ x: 0, y: 0.5 }}
-                            end={{ x: 1, y: 0.5 }}
-                            style={[styles.progressBar, { width: `${Math.min(progress, 100)}%` }]}
-                        />
+                        <View style={[styles.progressBar, { width: `${Math.min(progress, 100)}%`, experimental_backgroundImage: 'linear-gradient(to right, #4ade80, #38E0D2, #2dd4bf)' }]} />
                     </View>
                 )}
                 <Pressable
@@ -413,7 +595,7 @@ export default function SmartCleanScreen() {
                     }}
                 >
                     <X size={18} color="#ff6b6b" />
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                    <Text style={styles.cancelButtonText}>{t("common.cancel")}</Text>
                 </Pressable>
             </FuturisticHomeBackground>
         );
@@ -428,85 +610,79 @@ export default function SmartCleanScreen() {
                         <ArrowLeft size={22} color="#4ade80" />
                     </Pressable>
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.title} numberOfLines={2}>
-                            Review {selectedCategory === "Custom" ? `"${customQuery}"` : selectedCategory}
+                        <Text style={styles.title} numberOfLines={1}>
+                            {isSelectMode
+                                ? t("smart.selectedCount", { count: selectedForDeletion.size })
+                                : (selectedCategory === "Custom" ? `"${customQuery}"` : t(CATEGORIES.find(c => c.label === selectedCategory)?.labelKey as CategoryLabelKey))}
                         </Text>
-                        <Text style={styles.subtitle} numberOfLines={3}>
-                            Found {matchedPhotos.length} photos.{isScanningInBackground ? " Still scanning..." : ""} Deselect any you want to keep.
-                        </Text>
+                        {!isSelectMode && (
+                            <Text style={styles.subtitle} numberOfLines={1}>
+                                {t("smart.photosFound", { count: matchedPhotos.length })}{!scanComplete ? t("smart.stillScanning") : ""}
+                            </Text>
+                        )}
                     </View>
+                    {matchedPhotos.length > 0 && (
+                        <View style={styles.headerButtons}>
+                            {isSelectMode && (
+                                <Pressable onPress={handleSelectAll} style={styles.selectButton}>
+                                    <Text style={styles.selectButtonText}>
+                                        {selectedForDeletion.size === matchedPhotos.length ? t("deleteScreen.deselectAll") : t("deleteScreen.selectAll")}
+                                    </Text>
+                                </Pressable>
+                            )}
+                            <Pressable onPress={toggleSelectMode} style={styles.selectButton}>
+                                <Text style={styles.selectButtonText}>
+                                    {isSelectMode ? t("common.cancel") : t("deleteScreen.select")}
+                                </Text>
+                            </Pressable>
+                        </View>
+                    )}
                 </View>
 
-                <LinearGradient
-                    colors={["rgba(74,222,128,0)", "rgba(74,222,128,0.4)", "rgba(74,222,128,0)"]}
-                    start={{ x: 0, y: 0.5 }}
-                    end={{ x: 1, y: 0.5 }}
-                    style={styles.separator}
-                />
+                <View style={[styles.separator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.4), rgba(74,222,128,0))' }]} />
 
-                {matchedPhotos.length === 0 ? (
+                {matchedPhotos.length === 0 && scanComplete ? (
                     <View style={styles.emptyState}>
                         <View style={styles.emptyIconGlow}>
-                            <CheckCircle size={72} color="#4ade80" />
+                            <Search size={72} color="#4ade80" />
                         </View>
-                        <Text style={styles.emptyLabel}>No matching photos found.</Text>
+                        <Text style={styles.emptyLabel}>{t("smart.noMatchingPhotos")}</Text>
                         <Pressable
                             style={styles.primaryButton}
                             onPress={() => setStep("SELECT_CATEGORY")}
                         >
                             <ArrowLeft size={18} color="#fff" />
-                            <Text style={styles.primaryButtonText}>Go Back</Text>
+                            <Text style={styles.primaryButtonText}>{t("smart.goBack")}</Text>
                         </Pressable>
                     </View>
                 ) : (
                     <>
-                        <FlatList
-                            data={matchedPhotos}
-                            keyExtractor={(item) => item.id}
-                            numColumns={3}
-                            contentContainerStyle={[styles.gridContent, { paddingBottom: tabBarHeight + 130 }]}
-                            renderItem={({ item }) => {
-                                const selected = selectedForDeletion.has(item.id);
-                                return (
-                                    <TouchableOpacity
-                                        style={styles.gridItemWrapper}
-                                        onPress={() => toggleSelection(item.id)}
-                                        activeOpacity={0.8}
-                                    >
-                                        <View style={[styles.gridImageWrapper, selected && styles.gridImageWrapperSelected]}>
-                                            <Image
-                                                source={{ uri: item.uri }}
-                                                style={[styles.gridImage, selected && styles.gridImageSelected]}
-                                                contentFit="cover"
-                                                transition={200}
-                                            />
-                                        </View>
-                                        <View style={styles.checkboxContainer}>
-                                            {selected ? (
-                                                <View style={styles.checkboxSelected}>
-                                                    <CheckCircle size={18} color="#fff" />
-                                                </View>
-                                            ) : (
-                                                <View style={styles.checkboxDefault}>
-                                                    <Circle size={18} color="rgba(255,255,255,0.5)" />
-                                                </View>
-                                            )}
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            }}
-                        />
+                        <GestureDetector gesture={panGesture}>
+                            <View style={styles.listContainer} ref={listContainerRef}>
+                                <FlatList
+                                    ref={flatListRef}
+                                    data={matchedPhotos}
+                                    keyExtractor={(item) => item.id}
+                                    numColumns={COLUMN_COUNT}
+                                    extraData={[selectedForDeletion, isSelectMode]}
+                                    contentContainerStyle={[styles.gridContent, { paddingBottom: tabBarHeight + 130 }]}
+                                    onLayout={(e) => { listStartY.current = e.nativeEvent.layout.y; }}
+                                    onScroll={(e) => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
+                                    scrollEventThrottle={16}
+                                    scrollEnabled={!isScrollingDisabled}
+                                    onEndReached={handleEndReached}
+                                    onEndReachedThreshold={0.3}
+                                    ListFooterComponent={renderListFooter}
+                                    renderItem={renderItem}
+                                />
+                            </View>
+                        </GestureDetector>
 
-                        {selectedForDeletion.size > 0 && (
-                            <View
-                                style={[
-                                    styles.deleteButtonContainer,
-                                    { bottom: tabBarHeight + 52 },
-                                ]}
-                            >
+                        {isSelectMode && selectedForDeletion.size > 0 && (
+                            <View style={[styles.deleteButtonContainer, { bottom: tabBarHeight + 52 }]}>
                                 <Button
                                     onPress={confirmDeletion}
-                                    title={`Delete ${selectedForDeletion.size} ${selectedForDeletion.size === 1 ? "Photo" : "Photos"}`}
+                                    title={t("smart.deletePhotos", { count: selectedForDeletion.size })}
                                     icon={<Trash2 size={20} color="#fff" />}
                                     style={styles.deleteButton}
                                     textStyle={styles.deleteButtonText}
@@ -517,6 +693,14 @@ export default function SmartCleanScreen() {
                     </>
                 )}
             </View>
+
+            <PhotoPreviewModal
+                visible={previewIndex !== null}
+                photos={matchedPhotos as unknown as PhotoAsset[]}
+                initialIndex={previewIndex ?? 0}
+                variant="view-only"
+                onClose={() => setPreviewIndex(null)}
+            />
         </FuturisticHomeBackground>
     );
 }
@@ -526,6 +710,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     innerContainer: {
+        flex: 1,
+    },
+    listContainer: {
         flex: 1,
     },
     scrollContent: {
@@ -545,7 +732,7 @@ const styles = StyleSheet.create({
         paddingTop: 16,
         paddingBottom: 8,
         flexDirection: "row",
-        alignItems: "flex-start",
+        alignItems: "center",
         gap: 14,
     },
     headerTextContainer: {
@@ -567,10 +754,10 @@ const styles = StyleSheet.create({
         borderColor: "rgba(74,222,128,0.3)",
         justifyContent: "center",
         alignItems: "center",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 12,
+        shadowOpacity: 0.4,
     },
     backButton: {
         width: 40,
@@ -581,7 +768,27 @@ const styles = StyleSheet.create({
         borderColor: "rgba(74,222,128,0.3)",
         justifyContent: "center",
         alignItems: "center",
-        marginTop: 4,
+        flexShrink: 0,
+    },
+    headerButtons: {
+        flexDirection: "row",
+        gap: 8,
+        alignItems: "center",
+        flexShrink: 0,
+    },
+    selectButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 7,
+        borderRadius: 20,
+        borderCurve: 'continuous',
+        backgroundColor: "rgba(74,222,128,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.3)",
+    },
+    selectButtonText: {
+        fontSize: 14,
+        fontWeight: "600",
+        color: "#4ade80",
     },
     separator: {
         height: 1,
@@ -589,7 +796,7 @@ const styles = StyleSheet.create({
         marginVertical: 14,
     },
     title: {
-        fontSize: 28,
+        fontSize: 22,
         fontWeight: "bold",
         color: "#fff",
         textShadowColor: "rgba(74,222,128,0.3)",
@@ -598,7 +805,7 @@ const styles = StyleSheet.create({
     },
     subtitle: {
         fontSize: 14,
-        marginTop: 0,
+        marginTop: 2,
         color: "rgba(255,255,255,0.45)",
         lineHeight: 18,
     },
@@ -615,6 +822,7 @@ const styles = StyleSheet.create({
         width: "46%",
         aspectRatio: 1.15,
         borderRadius: 16,
+        borderCurve: 'continuous',
         justifyContent: "center",
         alignItems: "center",
         paddingBottom: 20,
@@ -651,6 +859,7 @@ const styles = StyleSheet.create({
         padding: 16,
         borderWidth: 1,
         borderRadius: 14,
+        borderCurve: 'continuous',
         borderColor: "rgba(74,222,128,0.3)",
         backgroundColor: "rgba(74,222,128,0.05)",
         color: "#fff",
@@ -663,13 +872,14 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 28,
         borderRadius: 24,
+        borderCurve: 'continuous',
         backgroundColor: "rgba(74,222,128,0.15)",
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.5)",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 12,
+        shadowOpacity: 0.3,
     },
     primaryButtonText: {
         color: "#fff",
@@ -680,10 +890,10 @@ const styles = StyleSheet.create({
 
     // ── Scanning ────────────────────────────────────────────────
     scannerGlow: {
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.4,
-        shadowRadius: 30,
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 30,
+        shadowOpacity: 0.4,
     },
     scanningTitle: {
         fontSize: 22,
@@ -712,6 +922,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         paddingHorizontal: 20,
         borderRadius: 20,
+        borderCurve: 'continuous',
         backgroundColor: "rgba(255,107,107,0.1)",
         borderWidth: 1,
         borderColor: "rgba(255,107,107,0.3)",
@@ -731,31 +942,28 @@ const styles = StyleSheet.create({
     },
     progressBar: {
         height: "100%",
-        borderRadius: 3,
     },
 
     // ── Review Grid ─────────────────────────────────────────────
     gridContent: {
-        padding: 4,
+        paddingHorizontal: GAP,
     },
     gridItemWrapper: {
-        flex: 1 / 3,
-        aspectRatio: 1,
-        padding: 2,
+        width: ITEM_SIZE,
+        height: ITEM_SIZE,
+        margin: GAP / 2,
+        overflow: "visible",
     },
     gridImageWrapper: {
         flex: 1,
         borderRadius: 10,
+        borderCurve: 'continuous',
         overflow: "hidden",
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.12)",
     },
     gridImageWrapperSelected: {
         borderColor: "rgba(74,222,128,0.6)",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 0 },
     },
     gridImage: {
         width: "100%",
@@ -764,30 +972,38 @@ const styles = StyleSheet.create({
     gridImageSelected: {
         opacity: 0.65,
     },
-    checkboxContainer: {
+    checkCircle: {
         position: "absolute",
         bottom: 8,
         right: 8,
-    },
-    checkboxSelected: {
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: "#4ade80",
-        justifyContent: "center",
-        alignItems: "center",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.6,
-        shadowRadius: 6,
-        shadowOffset: { width: 0, height: 0 },
-    },
-    checkboxDefault: {
-        width: 24,
-        height: 24,
-        borderRadius: 12,
+        borderWidth: 1.5,
+        borderColor: "rgba(255,255,255,0.5)",
         backgroundColor: "rgba(0,0,0,0.4)",
         justifyContent: "center",
         alignItems: "center",
+        zIndex: 10,
+    },
+    checkCircleSelected: {
+        backgroundColor: "#4ade80",
+        borderColor: "#4ade80",
+        shadowColor: '#4ade80',
+        shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 6,
+        shadowOpacity: 0.6,
+    },
+    loadingFooter: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        paddingVertical: 20,
+    },
+    loadingFooterText: {
+        color: "rgba(74,222,128,0.6)",
+        fontSize: 13,
     },
 
     // ── Footer ──────────────────────────────────────────────────
@@ -804,12 +1020,12 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         paddingVertical: 16,
         borderRadius: 14,
+        borderCurve: 'continuous',
         gap: 8,
-        shadowColor: "#ff3b30",
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowColor: '#ff3b30',
         shadowOffset: { width: 0, height: 0 },
-        elevation: 8,
+        shadowRadius: 12,
+        shadowOpacity: 0.4,
     },
     deleteButtonText: {
         color: "#fff",
@@ -828,11 +1044,11 @@ const styles = StyleSheet.create({
     emptyIconGlow: {
         padding: 20,
         borderRadius: 60,
-        backgroundColor: "transparent",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.4,
-        shadowRadius: 30,
+        backgroundColor: "rgba(74,222,128,0.01)",
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 30,
+        shadowOpacity: 0.4,
     },
     emptyLabel: {
         fontSize: 17,

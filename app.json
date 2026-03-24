@@ -2,7 +2,7 @@
   "expo": {
     "name": "SwipeSpark",
     "slug": "swipespark",
-    "version": "1.0.0",
+    "version": "1.0.9",
     "orientation": "portrait",
     "icon": "./assets/images/1024.png",
     "scheme": "swipespark",
@@ -10,6 +10,12 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "splash": {
+        "image": "./assets/splash_screens/iPhone_16__iPhone_15_Pro__iPhone_15__iPhone_14_Pro_portrait.png",
+        "tabletImage": "./assets/splash_screens/12.9__iPad_Pro_portrait.png",
+        "resizeMode": "cover",
+        "backgroundColor": "#000000"
+      },
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "The app needs access to your photos to help you free up space.",
         "ITSAppUsesNonExemptEncryption": false
@@ -35,7 +41,8 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO"
       ],
-      "package": "com.themolinario.swipespark"
+      "package": "com.themolinario.swipespark",
+      "versionCode": 2
     },
     "web": {
       "output": "static",
@@ -46,14 +53,9 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/1024.png",
-          "imageWidth": 1536,
-          "imageHeight": 2752,
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "image": "./assets/splash_screens/iPhone_16__iPhone_15_Pro__iPhone_15__iPhone_14_Pro_portrait.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#000000"
         }
       ],
       [
@@ -63,7 +65,8 @@
           "savePhotosPermission": "The app needs permission to save photos to your library.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

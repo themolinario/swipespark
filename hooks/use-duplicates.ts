@@ -18,7 +18,7 @@ export function useDuplicates() {
         });
     }, []);
 
-    const scanDuplicates = useCallback(async () => {
+    const scanDuplicates = useCallback(async (forceRefresh = false) => {
         const permissionStatus = await mediaLibraryService.getPermissionStatus();
         if (permissionStatus !== "granted") {
             const granted = await mediaLibraryService.requestPermission();
@@ -30,7 +30,7 @@ export function useDuplicates() {
             setHasPermission(true);
         }
 
-        startScan();
+        startScan(forceRefresh);
     }, [startScan]);
 
     const deleteDuplicates = useCallback(async (photoIds: string[]) => {

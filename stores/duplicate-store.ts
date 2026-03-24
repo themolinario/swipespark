@@ -13,7 +13,7 @@ interface DuplicateStore {
     progress: number;
     scanStatusText: string;
 
-    startScan: () => Promise<void>;
+    startScan: (forceRefresh?: boolean) => Promise<void>;
     removeDuplicatesLocally: (ids: string[]) => void;
 }
 
@@ -43,7 +43,7 @@ export const useDuplicateStore = create<DuplicateStore>()(
                 });
             },
 
-            startScan: async () => {
+            startScan: async (forceRefresh = false) => {
                 const state = get();
                 if (state.isScanning) return;
 
@@ -52,11 +52,11 @@ export const useDuplicateStore = create<DuplicateStore>()(
 
                 const existingHashes = state.hashedAssets;
                 const hasLegacy = Object.values(existingHashes).some(isLegacyHash);
-                if (hasLegacy) {
+                if (hasLegacy || forceRefresh) {
                     set({ hashedAssets: {} });
                 }
 
-                set({ isScanning: true, progress: 0, scanStatusText: "Starting scanner..." });
+                set({ isScanning: true, progress: 0, scanStatusText: "Starting scanner...", duplicateGroups: [] });
 
                 try {
                     let cursor: string | undefined = undefined;

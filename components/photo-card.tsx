@@ -10,16 +10,16 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { PhotoAsset } from "@/services/media-library.service";
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const CARD_WIDTH = SCREEN_WIDTH * 0.88;
-const CARD_HEIGHT = SCREEN_HEIGHT * 0.55;
 
 interface PhotoCardProps {
   photo: PhotoAsset;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
   isActive: boolean;
+  cardHeight: number;
 }
 
 export const PhotoCard = memo(function PhotoCard({
@@ -27,6 +27,7 @@ export const PhotoCard = memo(function PhotoCard({
   onSwipeLeft,
   onSwipeRight,
   isActive,
+  cardHeight,
 }: PhotoCardProps) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -85,7 +86,7 @@ export const PhotoCard = memo(function PhotoCard({
 
   return (
     <GestureDetector gesture={panGesture}>
-      <Animated.View style={[styles.card, animatedStyle]}>
+      <Animated.View style={[styles.card, { height: cardHeight }, animatedStyle]}>
         <Image
           source={{ uri: photo.uri }}
           style={styles.image}
@@ -115,18 +116,13 @@ export const PhotoCard = memo(function PhotoCard({
 const styles = StyleSheet.create({
   card: {
     width: CARD_WIDTH,
-    height: CARD_HEIGHT,
     borderRadius: 20,
+    borderCurve: 'continuous',
     overflow: "hidden",
     position: "absolute",
     backgroundColor: "rgba(0,0,0,0.5)",
     borderWidth: 1,
     borderColor: "rgba(74, 222, 128, 0.3)",
-    shadowColor: "#4ade80",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
   },
   image: {
     width: "100%",
@@ -151,6 +147,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 12,
+    borderCurve: 'continuous',
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
@@ -158,19 +155,17 @@ const styles = StyleSheet.create({
   },
   deleteIndicatorContent: {
     borderColor: "#ff3b30",
-    shadowColor: "#ff3b30",
+    shadowColor: '#ff3b30',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
     shadowRadius: 15,
-    elevation: 10,
+    shadowOpacity: 0.8,
   },
   keepIndicatorContent: {
     borderColor: "#4ade80",
-    shadowColor: "#4ade80",
+    shadowColor: '#4ade80',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
     shadowRadius: 15,
-    elevation: 10,
+    shadowOpacity: 0.8,
   },
   indicatorText: {
     fontSize: 32,

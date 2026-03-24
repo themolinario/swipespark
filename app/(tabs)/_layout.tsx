@@ -1,8 +1,10 @@
 import { FuturisticTabBar } from "@/components/ui/futuristic-tab-bar";
 import { Images, Heart, Trash2, Copy, Wand2 } from "lucide-react-native";
 import { Tabs } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 export default function TabLayout() {
+  const { t } = useTranslation();
   return (
     <Tabs
       tabBar={(props) => <FuturisticTabBar {...props} />}
@@ -14,7 +16,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Swipe",
+          title: t("tabs.swipe"),
           tabBarIcon: ({ color, size }) => (
             <Images size={size} color={color} />
           ),
@@ -23,7 +25,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="kept"
         options={{
-          title: "Keep",
+          title: t("tabs.keep"),
           tabBarIcon: ({ color, size }) => (
             <Heart size={size} color={color} />
           ),
@@ -32,7 +34,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="delete"
         options={{
-          title: "Delete",
+          title: t("tabs.delete"),
           tabBarIcon: ({ color, size }) => (
             <Trash2 size={size} color={color} />
           ),
@@ -41,7 +43,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="duplicates"
         options={{
-          title: "Dupes",
+          title: t("tabs.dupes"),
           tabBarIcon: ({ color, size }) => (
             <Copy size={size} color={color} />
           ),
@@ -50,7 +52,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="smart-clean"
         options={{
-          title: "Smart",
+          title: t("tabs.smart"),
           tabBarIcon: ({ color, size }) => (
             <Wand2 size={size} color={color} />
           ),

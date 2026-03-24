@@ -1,6 +1,7 @@
 import { GlassView } from "@/components/ui/glass-view";
 import { memo } from "react";
 import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { ThemedText } from "./themed-text";
 
 interface DeletionSuccessModalProps {
@@ -23,8 +24,8 @@ export const DeletionSuccessModal = memo(function DeletionSuccessModal({
   freedBytes,
   onClose,
 }: DeletionSuccessModalProps) {
+  const { t } = useTranslation();
   const formattedSize = formatSize(freedBytes);
-  const photoLabel = deletedCount === 1 ? "photo" : "photos";
 
   return (
     <Modal
@@ -36,21 +37,21 @@ export const DeletionSuccessModal = memo(function DeletionSuccessModal({
       <View style={styles.overlay}>
         <GlassView style={styles.modal} tint="default">
           <ThemedText style={styles.title} lightColor="#000" darkColor="#fff">
-            Done!
+            {t("deletionSuccess.title")}
           </ThemedText>
           <ThemedText style={styles.subtitle} lightColor="#333" darkColor="#ddd">
-            {deletedCount} {photoLabel} permanently deleted
+            {t("deletionSuccess.subtitle", { count: deletedCount })}
           </ThemedText>
           <View style={styles.spaceContainer}>
             <ThemedText style={styles.spaceLabel} lightColor="#666" darkColor="#aaa">
-              Space freed
+              {t("deletionSuccess.spaceFreed")}
             </ThemedText>
             <ThemedText style={styles.spaceValue} lightColor="#007aff" darkColor="#4da6ff">
               {formattedSize}
             </ThemedText>
           </View>
           <Pressable style={styles.closeButton} onPress={onClose}>
-            <ThemedText style={styles.closeText}>Great!</ThemedText>
+            <ThemedText style={styles.closeText}>{t("deletionSuccess.close")}</ThemedText>
           </Pressable>
         </GlassView>
       </View>
@@ -68,6 +69,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     padding: 28,
     alignItems: "center",
     width: "100%",
@@ -89,6 +91,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(0, 122, 255, 0.08)",
     borderRadius: 14,
+    borderCurve: 'continuous',
     paddingHorizontal: 32,
     paddingVertical: 16,
     marginBottom: 24,
@@ -109,6 +112,7 @@ const styles = StyleSheet.create({
   closeButton: {
     backgroundColor: "#007aff",
     borderRadius: 12,
+    borderCurve: 'continuous',
     paddingVertical: 14,
     paddingHorizontal: 40,
     width: "100%",

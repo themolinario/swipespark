@@ -1,4 +1,3 @@
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect } from "react";
 import { StyleSheet, View, ViewProps } from "react-native";
 import Animated,
@@ -128,22 +127,13 @@ export function FuturisticWelcomeBackground({ children, style, ...props }: ViewP
   return (
     <View style={[styles.container, style]} {...props}>
       {/* Base gradient */}
-      <LinearGradient colors={["#0E291B", "#132E1F", "#080F0B"]} style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { experimental_backgroundImage: 'linear-gradient(to bottom, #0E291B, #132E1F, #080F0B)' }]} />
 
       {/* Animated overlay gradient */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, overlayStyle]} pointerEvents="none">
-        <LinearGradient
-          colors={[
-            "rgba(14, 41, 27, 0.82)",
-            "rgba(21, 58, 38, 0.58)",
-            "rgba(33, 90, 58, 0.42)",
-            "rgba(8, 15, 11, 0.86)",
-          ]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-      </Animated.View>
+      <Animated.View
+        style={[StyleSheet.absoluteFillObject, { experimental_backgroundImage: 'linear-gradient(135deg, rgba(14, 41, 27, 0.82), rgba(21, 58, 38, 0.58), rgba(33, 90, 58, 0.42), rgba(8, 15, 11, 0.86))' }, overlayStyle]}
+        pointerEvents="none"
+      />
 
       {/* Particles */}
       <View style={StyleSheet.absoluteFillObject} pointerEvents="none">

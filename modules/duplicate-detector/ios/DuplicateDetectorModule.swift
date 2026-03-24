@@ -25,7 +25,7 @@ public class DuplicateDetectorModule: Module {
         var results = [String: String](minimumCapacity: total)
         let lock = NSLock()
         let group = DispatchGroup()
-        let semaphore = DispatchSemaphore(value: 10)
+        let semaphore = DispatchSemaphore(value: 20)
         var completed = 0
 
         let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: assetIds, options: nil)
@@ -36,11 +36,6 @@ public class DuplicateDetectorModule: Module {
         }
 
         let imageManager = PHImageManager.default()
-        let requestOptions = PHImageRequestOptions()
-        requestOptions.isSynchronous = true
-        requestOptions.isNetworkAccessAllowed = false
-        requestOptions.version = .current
-        requestOptions.deliveryMode = .highQualityFormat
 
         for assetId in assetIds {
           group.enter()
@@ -57,7 +52,7 @@ public class DuplicateDetectorModule: Module {
               completed += 1
               let c = completed
               lock.unlock()
-              if c % 50 == 0 || c == total {
+              if c % 100 == 0 || c == total {
                 self.sendEvent("onProgress", ["completed": c, "total": total])
               }
               return
@@ -92,10 +87,16 @@ public class DuplicateDetectorModule: Module {
                 }
               )
 
-              dataSemaphore.wait()
+              let _ = dataSemaphore.wait(timeout: .now() + 10)
             }
 
             if hashString == nil {
+              let requestOptions = PHImageRequestOptions()
+              requestOptions.isSynchronous = true
+              requestOptions.isNetworkAccessAllowed = false
+              requestOptions.version = .current
+              requestOptions.deliveryMode = .highQualityFormat
+
               imageManager.requestImageDataAndOrientation(
                 for: asset,
                 options: requestOptions
@@ -115,7 +116,7 @@ public class DuplicateDetectorModule: Module {
             let c = completed
             lock.unlock()
 
-            if c % 50 == 0 || c == total {
+            if c % 100 == 0 || c == total {
               self.sendEvent("onProgress", ["completed": c, "total": total])
             }
           }
@@ -127,4 +128,3 @@ public class DuplicateDetectorModule: Module {
     }
   }
 }
-

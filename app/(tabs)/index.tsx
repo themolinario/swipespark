@@ -13,12 +13,19 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
 import { Trash2, Undo2 } from "lucide-react-native";
 import { useCallback, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
+import { Dimensions, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+const SCREEN_HEIGHT = Dimensions.get("window").height;
+const DEFAULT_CARD_HEIGHT = SCREEN_HEIGHT * 0.55;
+
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
+
+  const [swiperContainerHeight, setSwiperContainerHeight] = useState(DEFAULT_CARD_HEIGHT);
 
   const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number; freedBytes: number }>({
     visible: false,
@@ -135,6 +142,7 @@ export default function HomeScreen() {
     <FuturisticHomeBackground
       style={[styles.container, { paddingTop: insets.top }]}
     >
+      <View style={styles.headerWrapper}>
       <StatsHeader
         currentIndex={currentIndex}
         totalCount={totalCount}
@@ -151,12 +159,13 @@ export default function HomeScreen() {
               <View style={styles.headerConfirmButtonGlow} />
               <Trash2 size={14} color="#ffffff" style={{ marginRight: 6 }} />
               <Text style={styles.headerConfirmButtonText}>
-                Delete {deletedCount}
+                {t("home.deleteCount", { count: deletedCount })}
               </Text>
             </Pressable>
           ) : undefined
         }
       />
+      </View>
 
       {isComplete ? (
         <ScrollView
@@ -179,18 +188,22 @@ export default function HomeScreen() {
               ]}
             >
               <Undo2 size={20} color="#ffffff" style={{ marginRight: 8 }} />
-              <Text style={styles.completeUndoText}>Undo</Text>
+              <Text style={styles.completeUndoText}>{t("home.undo")}</Text>
             </Pressable>
           )}
         </ScrollView>
       ) : (
         <>
-          <View style={styles.swiperContainer}>
+          <View
+            style={styles.swiperContainer}
+            onLayout={(e) => setSwiperContainerHeight(e.nativeEvent.layout.height)}
+          >
             <PhotoSwiper
               photos={photos}
               currentIndex={currentIndex}
               onSwipeLeft={handleSwipeLeft}
               onSwipeRight={handleKeep}
+              cardHeight={Math.min(swiperContainerHeight - 32, DEFAULT_CARD_HEIGHT)}
             />
           </View>
 
@@ -204,6 +217,7 @@ export default function HomeScreen() {
           </View>
         </>
       )}
+
       <DeletionSuccessModal
         visible={successModal.visible}
         deletedCount={successModal.count}
@@ -218,13 +232,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerWrapper: {
+    zIndex: 2,
+  },
   swiperContainer: {
     flex: 1,
     minHeight: 200,
+    paddingTop: 16,
+    zIndex: 1,
   },
   footer: {
     paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 30,
+    zIndex: 2,
   },
   completeContainer: {
     flexGrow: 1,
@@ -240,13 +261,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(255, 59, 48, 0.15)",
     borderWidth: 1,
     borderColor: "rgba(255, 59, 48, 0.6)",
-    shadowColor: "#ff3b30",
+    shadowColor: '#ff3b30',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
     shadowRadius: 12,
+    shadowOpacity: 0.7,
     overflow: "visible",
   },
   headerConfirmButtonPressed: {
@@ -260,6 +282,7 @@ const styles = StyleSheet.create({
     right: -1,
     bottom: -1,
     borderRadius: 20,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(255, 59, 48, 0.08)",
   },
   headerConfirmButtonText: {
@@ -280,6 +303,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 14,
     borderRadius: 24,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(255, 255, 255, 0.1)",
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.25)",

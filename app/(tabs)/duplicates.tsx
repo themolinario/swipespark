@@ -7,8 +7,8 @@ import { DuplicateGroup } from "@/utils/duplicate-detection";
 import { Check, AlertCircle, Images, RefreshCcw, Zap, XCircle, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
     Alert,
     Dimensions,
@@ -31,6 +31,7 @@ const PHOTO_SIZE = Math.floor(
 );
 
 export default function DuplicatesScreen() {
+    const { t } = useTranslation();
     const tabBarHeight = useBottomTabBarHeight();
     const insets = useSafeAreaInsets();
 
@@ -111,14 +112,14 @@ export default function DuplicatesScreen() {
             if (success) {
                 setSelectedIds(new Set());
                 Alert.alert(
-                    "Success",
-                    `${idsToDelete.length} duplicate photos permanently deleted.`
+                    t("duplicates.success"),
+                    t("duplicates.deletedMessage", { count: idsToDelete.length })
                 );
             } else {
-                Alert.alert("Error", "Could not delete photos.");
+                Alert.alert(t("common.error"), t("duplicates.errorDelete"));
             }
         } catch {
-            Alert.alert("Error", "An error occurred while deleting.");
+            Alert.alert(t("common.error"), t("duplicates.errorGeneric"));
         } finally {
             setIsDeleting(false);
         }
@@ -295,7 +296,7 @@ export default function DuplicatesScreen() {
                                 {firstPhoto.filename}
                             </ThemedText>
                             <ThemedText style={styles.groupSubtitle}>
-                                {firstPhoto.width}x{firstPhoto.height} • {item.photos.length} copies
+                                {firstPhoto.width}x{firstPhoto.height} • {t("duplicates.copies", { count: item.photos.length })}
                             </ThemedText>
                         </View>
                     </View>
@@ -339,21 +340,16 @@ export default function DuplicatesScreen() {
                     <View style={styles.emptyIconGlow}>
                         <AnimatedScanner color="#4ade80" size={72} />
                     </View>
-                    <ThemedText style={styles.emptyTitle}>Scanning Library...</ThemedText>
+                    <ThemedText style={styles.emptyTitle}>{t("duplicates.scanningLibrary")}</ThemedText>
                     <ThemedText style={styles.emptySubtitle}>
-                        {scanStatusText || "Analyzing pixels to find exact duplicates."}
+                        {scanStatusText || t("duplicates.scanningSubtitle")}
                     </ThemedText>
 
                     <View style={styles.progressBarContainer}>
-                        <LinearGradient
-                            colors={["#4ade80", "#38E0D2"]}
-                            start={{ x: 0, y: 0.5 }}
-                            end={{ x: 1, y: 0.5 }}
-                            style={[styles.progressBarFill, { width: `${progressPercent}%` }]}
-                        />
+                        <View style={[styles.progressBarFill, { width: `${progressPercent}%`, experimental_backgroundImage: 'linear-gradient(to right, #4ade80, #38E0D2)' }]} />
                     </View>
                     <ThemedText style={styles.progressText}>
-                        {(progress * 100).toFixed(1)}% Complete
+                        {t("duplicates.percentComplete", { percent: (progress * 100).toFixed(1) })}
                     </ThemedText>
                 </View>
             );
@@ -365,13 +361,13 @@ export default function DuplicatesScreen() {
                     <View style={styles.emptyIconGlow}>
                         <AlertCircle size={72} color="#4ade80" />
                     </View>
-                    <ThemedText style={styles.emptyTitle}>Permission Needed</ThemedText>
+                    <ThemedText style={styles.emptyTitle}>{t("duplicates.permissionNeeded")}</ThemedText>
                     <ThemedText style={styles.emptySubtitle}>
-                        Please grant access to your photo library to find duplicates.
+                        {t("duplicates.permissionMessage")}
                     </ThemedText>
-                    <Pressable onPress={scanDuplicates} style={styles.scanAgainButton}>
+                    <Pressable onPress={() => scanDuplicates()} style={styles.scanAgainButton}>
                         <AlertCircle size={20} color="#4ade80" />
-                        <ThemedText style={styles.scanAgainText}>Grant Permission</ThemedText>
+                        <ThemedText style={styles.scanAgainText}>{t("duplicates.grantPermission")}</ThemedText>
                     </Pressable>
                 </View>
             );
@@ -382,13 +378,13 @@ export default function DuplicatesScreen() {
                 <View style={styles.emptyIconGlow}>
                     <Images size={72} color="#4ade80" />
                 </View>
-                <ThemedText style={styles.emptyTitle}>No Duplicates Found</ThemedText>
+                <ThemedText style={styles.emptyTitle}>{t("duplicates.noDuplicatesFound")}</ThemedText>
                 <ThemedText style={styles.emptySubtitle}>
-                    We couldn&apos;t find any exact copies in your library.
+                    {t("duplicates.noDuplicatesMessage")}
                 </ThemedText>
-                <Pressable onPress={scanDuplicates} style={styles.scanAgainButton}>
+                <Pressable onPress={() => scanDuplicates(true)} style={styles.scanAgainButton}>
                     <RefreshCcw size={20} color="#4ade80" />
-                    <ThemedText style={styles.scanAgainText}>Scan Again</ThemedText>
+                    <ThemedText style={styles.scanAgainText}>{t("duplicates.scanAgain")}</ThemedText>
                 </Pressable>
             </View>
         );
@@ -401,27 +397,22 @@ export default function DuplicatesScreen() {
             {/* Header */}
             <View style={styles.header}>
                 <View>
-                    <ThemedText style={styles.title}>Duplicates</ThemedText>
+                    <ThemedText style={styles.title}>{t("duplicates.title")}</ThemedText>
                     {!isScanning && duplicateGroups.length > 0 && (
                         <ThemedText style={styles.count}>
-                            {duplicateGroups.length} groups found
+                            {t("duplicates.groupsFound", { count: duplicateGroups.length })}
                         </ThemedText>
                     )}
                 </View>
                 {!isScanning && duplicateGroups.length > 0 && (
-                    <Pressable onPress={scanDuplicates} style={styles.actionIcon}>
+                    <Pressable onPress={() => scanDuplicates(true)} style={styles.actionIcon}>
                         <RefreshCcw size={22} color="#4ade80" />
                     </Pressable>
                 )}
             </View>
 
             {/* Neon separator */}
-            <LinearGradient
-                colors={["rgba(74,222,128,0)", "rgba(74,222,128,0.5)", "rgba(74,222,128,0)"]}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.headerSeparator}
-            />
+            <View style={[styles.headerSeparator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.5), rgba(74,222,128,0))' }]} />
 
             {duplicateGroups.length === 0 ? (
                 renderEmptyState()
@@ -430,12 +421,12 @@ export default function DuplicatesScreen() {
                     <View style={styles.toolbar}>
                         <Pressable onPress={handleAutoSelect} style={styles.toolbarButton}>
                             <Zap size={15} color="#4ade80" />
-                            <ThemedText style={styles.toolbarButtonText}>Auto-Select</ThemedText>
+                            <ThemedText style={styles.toolbarButtonText}>{t("duplicates.autoSelect")}</ThemedText>
                         </Pressable>
                         {selectedIds.size > 0 && (
                             <Pressable onPress={handleClearSelection} style={styles.toolbarButton}>
                                 <XCircle size={15} color="#4ade80" />
-                                <ThemedText style={styles.toolbarButtonText}>Clear</ThemedText>
+                                <ThemedText style={styles.toolbarButtonText}>{t("duplicates.clear")}</ThemedText>
                             </Pressable>
                         )}
                     </View>
@@ -478,9 +469,8 @@ export default function DuplicatesScreen() {
                                 onPress={handleConfirmDelete}
                                 title={
                                     isDeleting
-                                        ? "Deleting..."
-                                        : `Delete ${selectedIds.size} ${selectedIds.size === 1 ? "Copy" : "Copies"
-                                        }`
+                                        ? t("deleteScreen.deleting")
+                                        : t("duplicates.deleteCopies", { count: selectedIds.size })
                                 }
                                 icon={!isDeleting ? <Trash2 size={20} color="#fff" /> : undefined}
                                 style={styles.deleteButton}
@@ -531,6 +521,7 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
+        borderCurve: 'continuous',
         backgroundColor: "rgba(74,222,128,0.1)",
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.3)",
@@ -550,6 +541,7 @@ const styles = StyleSheet.create({
         paddingVertical: 8,
         paddingHorizontal: 14,
         borderRadius: 20,
+        borderCurve: 'continuous',
         backgroundColor: "rgba(74,222,128,0.08)",
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.25)",
@@ -566,6 +558,7 @@ const styles = StyleSheet.create({
         marginBottom: 24,
         backgroundColor: "rgba(74,222,128,0.03)",
         borderRadius: 14,
+        borderCurve: 'continuous',
         padding: 12,
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.08)",
@@ -598,17 +591,13 @@ const styles = StyleSheet.create({
     photoWrapper: {
         flex: 1,
         borderRadius: 10,
+        borderCurve: 'continuous',
         overflow: "hidden",
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.12)",
     },
     photoWrapperSelected: {
         borderColor: "rgba(74,222,128,0.6)",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.4,
-        shadowRadius: 8,
-        shadowOffset: { width: 0, height: 0 },
-        elevation: 8,
     },
     photo: {
         width: "100%",
@@ -629,11 +618,10 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
         justifyContent: "center",
         alignItems: "center",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.6,
-        shadowRadius: 6,
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
-        elevation: 6,
+        shadowRadius: 6,
+        shadowOpacity: 0.6,
     },
     emptyContainer: {
         flex: 1,
@@ -645,11 +633,10 @@ const styles = StyleSheet.create({
     emptyIconGlow: {
         padding: 20,
         borderRadius: 60,
-        backgroundColor: "transparent",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.4,
-        shadowRadius: 30,
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 30,
+        shadowOpacity: 0.4,
     },
     emptyTitle: {
         fontSize: 22,
@@ -676,13 +663,14 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         paddingHorizontal: 32,
         borderRadius: 24,
+        borderCurve: 'continuous',
         backgroundColor: "rgba(74,222,128,0.1)",
         borderWidth: 1,
         borderColor: "rgba(74,222,128,0.4)",
-        shadowColor: "#4ade80",
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
+        shadowColor: '#4ade80',
         shadowOffset: { width: 0, height: 0 },
+        shadowRadius: 12,
+        shadowOpacity: 0.3,
     },
     scanAgainText: {
         fontSize: 16,
@@ -720,12 +708,12 @@ const styles = StyleSheet.create({
         justifyContent: "center",
         paddingVertical: 16,
         borderRadius: 14,
+        borderCurve: 'continuous',
         gap: 8,
-        shadowColor: "#ff3b30",
-        shadowOpacity: 0.4,
-        shadowRadius: 12,
+        shadowColor: '#ff3b30',
         shadowOffset: { width: 0, height: 0 },
-        elevation: 8,
+        shadowRadius: 12,
+        shadowOpacity: 0.4,
     },
     deleteButtonText: {
         color: "#fff",

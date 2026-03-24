@@ -1,9 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedText } from "@/components/themed-text";
 import { FuturisticWelcomeBackground } from "@/components/ui/futuristic-welcome-background";
-import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 
 const ONBOARDING_KEY = "swipespark_onboarding_done";
 
@@ -11,7 +11,8 @@ async function completeOnboarding() {
   await AsyncStorage.setItem(ONBOARDING_KEY, "true");
   router.replace("/(tabs)");
 }
-import { Image, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Image } from "expo-image";
 import Animated, {
   Easing,
   interpolate,
@@ -25,6 +26,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function WelcomeScreen() {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
 
   const buttonScale = useSharedValue(0);
@@ -64,7 +66,7 @@ export default function WelcomeScreen() {
               <Image
                 source={require("../assets/images/logo.png")}
                 style={styles.logoImage}
-                resizeMode="cover"
+                contentFit="cover"
               />
             </View>
           </View>
@@ -72,26 +74,21 @@ export default function WelcomeScreen() {
 
         <View style={styles.textContainer}>
           <ThemedText style={styles.title}>
-            WELCOME TO THE{"\n"}
-            <ThemedText style={styles.titleHighlight}>FUTURE OF PHOTO CLEANING.</ThemedText>
+            {t("welcome.title")}{"\n"}
+            <ThemedText style={styles.titleHighlight}>{t("welcome.titleHighlight")}</ThemedText>
           </ThemedText>
 
           <ThemedText style={styles.subtitle}>
-            Optimized Swipe for clearing memory, automated duplicate removal, and AI-powered image analysis.
+            {t("welcome.subtitle")}
           </ThemedText>
         </View>
 
         <Animated.View style={[styles.buttonWrapper, buttonAnimatedStyle]}>
           <Animated.View style={[styles.buttonGlowBackground, buttonGlowAnimatedStyle]} pointerEvents="none" />
           <Pressable onPress={completeOnboarding} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-            <LinearGradient
-              colors={["rgba(66, 245, 135, 0.18)", "rgba(33, 90, 58, 0.18)", "rgba(56, 224, 210, 0.12)"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            />
+            <View style={[styles.buttonGradient, { experimental_backgroundImage: 'linear-gradient(to right, rgba(66, 245, 135, 0.18), rgba(33, 90, 58, 0.18), rgba(56, 224, 210, 0.12))' }]} />
             <View style={styles.buttonInnerBorder}>
-              <ThemedText style={styles.buttonText}>START CLEANING</ThemedText>
+              <ThemedText style={styles.buttonText}>{t("welcome.startButton")}</ThemedText>
             </View>
           </Pressable>
         </Animated.View>
@@ -119,11 +116,11 @@ const styles = StyleSheet.create({
     height: 190,
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#42F587",
+    backgroundColor: "rgba(66,245,135,0.01)",
+    shadowColor: '#42f587',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.95,
     shadowRadius: 40,
-    elevation: 20,
+    shadowOpacity: 0.95,
   },
   logoMask: {
     width: 190,
@@ -135,6 +132,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
     borderColor: "rgba(66, 245, 135, 0.45)",
     backgroundColor: "rgba(10, 20, 14, 0.58)",
+    borderCurve: 'continuous',
   },
   logoImage: {
     width: "105%",
@@ -184,16 +182,16 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     backgroundColor: "rgba(33, 90, 58, 0.42)",
-    shadowColor: "#38E0D2",
+    shadowColor: '#38e0d2',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
     shadowRadius: 28,
-    elevation: 20,
+    shadowOpacity: 1,
   },
   button: {
     width: "90%",
     height: 60,
     borderRadius: 30,
+    borderCurve: 'continuous',
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
@@ -212,6 +210,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(56, 224, 210, 0.38)",
     borderRadius: 30,
+    borderCurve: 'continuous',
   },
   buttonText: {
     color: "#E8FBF0",

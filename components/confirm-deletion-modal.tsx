@@ -1,6 +1,7 @@
 import { GlassView } from "@/components/ui/glass-view";
 import { memo } from "react";
 import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { ThemedText } from "./themed-text";
 
 interface ConfirmDeletionModalProps {
@@ -16,6 +17,7 @@ export const ConfirmDeletionModal = memo(function ConfirmDeletionModal({
   onConfirm,
   onCancel,
 }: ConfirmDeletionModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal
       visible={visible}
@@ -27,14 +29,14 @@ export const ConfirmDeletionModal = memo(function ConfirmDeletionModal({
         <GlassView style={styles.modal} tint="default">
           <ThemedText style={styles.icon}>🗑️</ThemedText>
           <ThemedText style={styles.title} lightColor="#000" darkColor="#fff">
-            Delete {deletedCount} photos?
+            {t("confirmDeletion.title", { count: deletedCount })}
           </ThemedText>
           <ThemedText
             style={styles.description}
             lightColor="#666"
             darkColor="#aaa"
           >
-            This action cannot be undone. The photos will be moved to the trash.
+            {t("confirmDeletion.description")}
           </ThemedText>
           <View style={styles.buttons}>
             <Pressable
@@ -46,14 +48,14 @@ export const ConfirmDeletionModal = memo(function ConfirmDeletionModal({
                 lightColor="#007aff"
                 darkColor="#007aff"
               >
-                Cancel
+                {t("common.cancel")}
               </ThemedText>
             </Pressable>
             <Pressable
               style={[styles.button, styles.confirmButton]}
               onPress={onConfirm}
             >
-              <ThemedText style={styles.confirmText}>Delete</ThemedText>
+              <ThemedText style={styles.confirmText}>{t("confirmDeletion.confirm")}</ThemedText>
             </Pressable>
           </View>
         </GlassView>
@@ -72,6 +74,7 @@ const styles = StyleSheet.create({
   },
   modal: {
     borderRadius: 20,
+    borderCurve: 'continuous',
     padding: 24,
     alignItems: "center",
     width: "100%",
@@ -103,6 +106,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
+    borderCurve: 'continuous',
     alignItems: "center",
   },
   cancelButton: {

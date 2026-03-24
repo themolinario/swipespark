@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { ThemedText } from "./themed-text";
 
 interface StatsHeaderProps {
@@ -15,6 +16,7 @@ export const StatsHeader = memo(function StatsHeader({
   deletedCount,
   actionButton,
 }: StatsHeaderProps) {
+  const { t } = useTranslation();
   const displayedIndex = totalCount > 0 ? Math.min(currentIndex + 1, totalCount) : 0;
   const progress = totalCount > 0 ? (displayedIndex / totalCount) * 100 : 0;
 
@@ -25,23 +27,22 @@ export const StatsHeader = memo(function StatsHeader({
           <ThemedText style={styles.statValue}>{displayedIndex}</ThemedText>
           <ThemedText style={styles.statLabel}>/ {totalCount}</ThemedText>
         </View>
+        {actionButton && (
+          <View style={styles.actionButtonWrapper} pointerEvents="box-none">
+            {actionButton}
+          </View>
+        )}
         <View style={styles.statItem}>
           <ThemedText style={[styles.statValue, styles.deleteValue]}>
             {deletedCount}
           </ThemedText>
-          <ThemedText style={styles.statLabel}>to delete</ThemedText>
+          <ThemedText style={styles.statLabel}>{t("stats.toDelete")}</ThemedText>
         </View>
       </View>
 
       <View style={styles.progressContainer}>
         <View style={[styles.progressBar, { width: `${progress}%` }]} />
       </View>
-      {actionButton && (
-          <View style={styles.actionButtonWrapper}>
-            {actionButton}
-          </View>
-      )}
-
     </View>
   );
 });
@@ -82,8 +83,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   actionButtonWrapper: {
+    position: "absolute",
+    left: 0,
+    right: 0,
     alignItems: "center",
-    marginTop: 10,
+    pointerEvents: "box-none",
+    marginBottom: 2,
   },
   progressContainer: {
     height: 4,
@@ -95,9 +100,5 @@ const styles = StyleSheet.create({
     height: "100%",
     backgroundColor: "#4ade80",
     borderRadius: 2,
-    shadowColor: "#4ade80",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 1,
-    shadowRadius: 5,
   },
 });

@@ -83,7 +83,7 @@ export const Button: React.FC<ButtonProps> = ({
           {icon}
         </View>
       )}
-      {title && (
+      {!!title && (
         <Text style={[styles.text, { color: getTextColor() }, textStyle]}>
           {title}
         </Text>
@@ -95,6 +95,7 @@ export const Button: React.FC<ButtonProps> = ({
 const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
+    borderCurve: 'continuous',
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

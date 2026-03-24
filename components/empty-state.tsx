@@ -1,18 +1,20 @@
 import { Sparkles } from "lucide-react-native";
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import { ThemedText } from "./themed-text";
 
 export const EmptyState = memo(function EmptyState() {
+  const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <View style={styles.content}>
         <View style={styles.iconContainer}>
           <Sparkles size={72} color="#4ade80" strokeWidth={1.5} />
         </View>
-        <ThemedText style={styles.title}>All done!</ThemedText>
+        <ThemedText style={styles.title}>{t("emptyState.title")}</ThemedText>
         <ThemedText style={styles.description}>
-          You&apos;ve reviewed all the photos in your camera roll.
+          {t("emptyState.description")}
         </ThemedText>
       </View>
     </View>
@@ -41,10 +43,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 20,
-    shadowColor: "#4ade80",
+    shadowColor: '#4ade80',
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
     shadowRadius: 20,
+    shadowOpacity: 0.3,
   },
   title: {
     fontSize: 28,

@@ -7,8 +7,8 @@ import { usePhotoStore } from "@/stores/photo-store";
 import { Check, Undo2, Heart } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
@@ -26,6 +26,7 @@ const GAP = 3;
 const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 
 export default function KeptPhotosScreen() {
+  const { t } = useTranslation();
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
 
@@ -64,12 +65,12 @@ export default function KeptPhotosScreen() {
   const handleRemovePhoto = useCallback(
     (photo: PhotoAsset) => {
       Alert.alert(
-        "Remove from list",
-        "Do you want to remove this photo from the keep list?",
+        t("keptScreen.removeFromList"),
+        t("keptScreen.removeMessage"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Remove",
+            text: t("keptScreen.remove"),
             style: "destructive",
             onPress: () => removeKeptPhoto(photo.id),
           },
@@ -95,6 +96,14 @@ export default function KeptPhotosScreen() {
     setIsSelectMode((prev) => !prev);
     setSelectedIds(new Set());
   }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedIds.size === keptPhotos.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(keptPhotos.map((p) => p.id)));
+    }
+  }, [selectedIds.size, keptPhotos]);
 
   const getIndexFromCoordinates = useCallback((x: number, y: number) => {
     const contentY = y + scrollOffset.current;
@@ -250,9 +259,9 @@ export default function KeptPhotosScreen() {
       <View style={styles.emptyIconGlow}>
         <Heart size={72} color="#4ade80" />
       </View>
-      <ThemedText style={styles.emptyTitle}>No photos to keep</ThemedText>
+      <ThemedText style={styles.emptyTitle}>{t("keptScreen.emptyTitle")}</ThemedText>
       <ThemedText style={styles.emptySubtitle}>
-        Swipe right on photos you want to keep{"\n"}to see them here
+        {t("keptScreen.emptySubtitle")}
       </ThemedText>
     </View>
   );
@@ -266,38 +275,42 @@ export default function KeptPhotosScreen() {
         <View>
           <ThemedText style={styles.title}>
             {isSelectMode
-              ? `${selectedIds.size} Selected`
-              : "Photos to Keep"}
+              ? t("keptScreen.selectedCount", { count: selectedIds.size })
+              : t("keptScreen.title")}
           </ThemedText>
           {!isSelectMode && (
             <ThemedText style={styles.count}>
-              {keptPhotos.length} {keptPhotos.length === 1 ? "photo" : "photos"}
+              {t("keptScreen.photoCount", { count: keptPhotos.length })}
             </ThemedText>
           )}
         </View>
         {keptPhotos.length > 0 && (
-          <Pressable onPress={toggleSelectMode} style={styles.selectButton}>
-            <ThemedText style={styles.selectButtonText}>
-              {isSelectMode ? "Cancel" : "Select"}
-            </ThemedText>
-          </Pressable>
+          <View style={styles.headerButtons}>
+            {isSelectMode && (
+              <Pressable onPress={handleSelectAll} style={styles.selectButton}>
+                <ThemedText style={styles.selectButtonText}>
+                  {selectedIds.size === keptPhotos.length ? t("keptScreen.deselectAll") : t("keptScreen.selectAll")}
+                </ThemedText>
+              </Pressable>
+            )}
+            <Pressable onPress={toggleSelectMode} style={styles.selectButton}>
+              <ThemedText style={styles.selectButtonText}>
+                {isSelectMode ? t("common.cancel") : t("keptScreen.select")}
+              </ThemedText>
+            </Pressable>
+          </View>
         )}
       </View>
 
       {/* Neon separator */}
-      <LinearGradient
-        colors={["rgba(74,222,128,0)", "rgba(74,222,128,0.5)", "rgba(74,222,128,0)"]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.headerSeparator}
-      />
+      <View style={[styles.headerSeparator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.5), rgba(74,222,128,0))' }]} />
 
       {keptPhotos.length === 0 ? (
         renderEmptyState()
       ) : (
         <>
           <ThemedText style={styles.hint}>
-            Tap to preview · Tap the undo icon to remove
+            {t("keptScreen.hint")}
           </ThemedText>
           <GestureDetector gesture={panGesture}>
             <View
@@ -330,7 +343,7 @@ export default function KeptPhotosScreen() {
             <View
               style={[
                 styles.actionButtonContainer,
-                { bottom: tabBarHeight + 40 },
+                { bottom: tabBarHeight + 44 },
               ]}
             >
               <Button
@@ -338,7 +351,7 @@ export default function KeptPhotosScreen() {
                   selectedIds.forEach((id) => removeKeptPhoto(id));
                   toggleSelectMode();
                 }}
-                title={`Restore ${selectedIds.size} selected to swipe`}
+                title={t("keptScreen.restoreSelected", { count: selectedIds.size })}
                 icon={<Undo2 size={20} color="#fff" />}
                 style={styles.actionButton}
                 variant="primary"
@@ -415,17 +428,13 @@ const styles = StyleSheet.create({
   photoWrapper: {
     flex: 1,
     borderRadius: 10,
+    borderCurve: 'continuous',
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(74,222,128,0.12)",
   },
   photoWrapperSelected: {
     borderColor: "rgba(74,222,128,0.6)",
-    shadowColor: "#4ade80",
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
   },
   photo: {
     width: "100%",
@@ -441,6 +450,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(0,0,0,0.6)",
     borderWidth: 1,
     borderColor: "rgba(74,222,128,0.3)",
@@ -463,16 +473,21 @@ const styles = StyleSheet.create({
   checkCircleSelected: {
     backgroundColor: "#4ade80",
     borderColor: "#4ade80",
-    shadowColor: "#4ade80",
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
+    shadowColor: '#4ade80',
     shadowOffset: { width: 0, height: 0 },
-    elevation: 6,
+    shadowRadius: 6,
+    shadowOpacity: 0.6,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
   },
   selectButton: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(74,222,128,0.1)",
     borderWidth: 1,
     borderColor: "rgba(74,222,128,0.3)",
@@ -492,11 +507,11 @@ const styles = StyleSheet.create({
   emptyIconGlow: {
     padding: 20,
     borderRadius: 60,
-    backgroundColor: "transparent",
-    shadowColor: "#4ade80",
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
+    backgroundColor: "rgba(74,222,128,0.01)",
+    shadowColor: '#4ade80',
     shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 30,
+    shadowOpacity: 0.4,
   },
   emptyTitle: {
     fontSize: 22,
@@ -528,11 +543,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 16,
     borderRadius: 14,
+    borderCurve: 'continuous',
     gap: 8,
-    shadowColor: "#4ade80",
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
+    shadowColor: '#4ade80',
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    shadowRadius: 12,
+    shadowOpacity: 0.3,
   },
 });

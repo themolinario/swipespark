@@ -7,6 +7,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "./themed-text";
 import { ThemedView } from "./themed-view";
@@ -20,6 +21,7 @@ export const PermissionRequest = memo(function PermissionRequest({
   onRequestPermission,
   permissionDenied = false,
 }: PermissionRequestProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [isRequesting, setIsRequesting] = useState(false);
 
@@ -55,11 +57,11 @@ export const PermissionRequest = memo(function PermissionRequest({
       >
         <View style={styles.content}>
           <ThemedText style={styles.icon}>📸</ThemedText>
-          <ThemedText style={styles.title}>Photo Access</ThemedText>
+          <ThemedText style={styles.title}>{t("permission.title")}</ThemedText>
           <ThemedText style={styles.description}>
             {permissionDenied
-              ? "Photo access was denied. Please enable it in Settings to use this app."
-              : "To help you free up space, we need access to your photos."}
+              ? t("permission.descriptionDenied")
+              : t("permission.descriptionDefault")}
           </ThemedText>
           <Pressable
             style={[styles.button, isRequesting && styles.buttonDisabled]}
@@ -68,10 +70,10 @@ export const PermissionRequest = memo(function PermissionRequest({
           >
             <ThemedText style={styles.buttonText}>
               {isRequesting
-                ? "Requesting..."
+                ? t("permission.requesting")
                 : permissionDenied
-                  ? "Open Settings"
-                  : "Allow Access"}
+                  ? t("permission.openSettings")
+                  : t("permission.allowAccess")}
             </ThemedText>
           </Pressable>
         </View>
@@ -115,6 +117,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 12,
+    borderCurve: 'continuous',
     marginTop: 20,
   },
   buttonDisabled: {

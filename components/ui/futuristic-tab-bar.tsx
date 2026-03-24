@@ -1,6 +1,5 @@
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import React, { useEffect } from "react";
 import {
@@ -63,11 +62,7 @@ export function FuturisticTabBar({
       <Animated.View style={[styles.glowLine, glowLineStyle]} />
 
       {/* Background */}
-      <View style={styles.backgroundContainer}>
-        <LinearGradient
-          colors={["rgba(5, 15, 10, 0.95)", "rgba(0, 0, 0, 0.98)"]}
-          style={StyleSheet.absoluteFillObject}
-        />
+      <View style={[styles.backgroundContainer, { experimental_backgroundImage: 'linear-gradient(to bottom, rgba(5, 15, 10, 0.95), rgba(0, 0, 0, 0.98))' }]}>
         {/* Subtle green ambient overlay */}
         <View style={styles.ambientOverlay} />
       </View>
@@ -203,14 +198,7 @@ function TabItem({
       style={styles.tabItem}
     >
       {/* Active background glow */}
-      <Animated.View style={[styles.activeBackground, bgStyle]}>
-        <LinearGradient
-          colors={["rgba(74, 222, 128, 0.3)", "rgba(74, 222, 128, 0.0)"]}
-          style={StyleSheet.absoluteFillObject}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-      </Animated.View>
+      <Animated.View style={[styles.activeBackground, { experimental_backgroundImage: 'linear-gradient(to bottom, rgba(74, 222, 128, 0.3), rgba(74, 222, 128, 0.0))' }, bgStyle]} />
 
       {/* Icon */}
       <Animated.View style={[styles.iconWrapper, iconContainerStyle]}>
@@ -241,14 +229,7 @@ function TabItem({
       </Animated.Text>
 
       {/* Bottom glow indicator dot */}
-      <Animated.View style={[styles.glowDot, glowDotStyle]}>
-        <LinearGradient
-          colors={[tintColor, "rgba(74, 222, 128, 0)"]}
-          style={styles.glowDotGradient}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-      </Animated.View>
+      <Animated.View style={[styles.glowDot, { experimental_backgroundImage: `linear-gradient(to bottom, ${tintColor}, rgba(74, 222, 128, 0))` }, glowDotStyle]} />
     </Pressable>
   );
 }
@@ -304,6 +285,7 @@ const styles = StyleSheet.create({
     right: 4,
     bottom: 0,
     borderRadius: 12,
+    borderCurve: 'continuous',
     overflow: "hidden",
   },
   iconWrapper: {
@@ -318,10 +300,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 0,
   },
   label: {
     fontSize: 10,
@@ -336,10 +314,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     borderRadius: 1.5,
     overflow: "hidden",
-  },
-  glowDotGradient: {
-    flex: 1,
-    borderRadius: 1.5,
   },
 });
 

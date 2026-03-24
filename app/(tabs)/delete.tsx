@@ -13,8 +13,8 @@ import { useDuplicateStore } from "@/stores/duplicate-store";
 import { Check, Undo2, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useCallback, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Alert,
   Dimensions,
@@ -33,6 +33,7 @@ const GAP = 3;
 const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 
 export default function DeletePhotosScreen() {
+  const { t } = useTranslation();
   const tabBarHeight = useBottomTabBarHeight();
   const insets = useSafeAreaInsets();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -79,12 +80,12 @@ export default function DeletePhotosScreen() {
   const handleRestorePhoto = useCallback(
     (photo: PhotoAsset) => {
       Alert.alert(
-        "Remove from list",
-        "Do you want to restore this photo from the deletion list?",
+        t("deleteScreen.removeFromList"),
+        t("deleteScreen.restoreMessage"),
         [
-          { text: "Cancel", style: "cancel" },
+          { text: t("common.cancel"), style: "cancel" },
           {
-            text: "Restore",
+            text: t("deleteScreen.restore"),
             style: "default",
             onPress: () => removeDeletionPhoto(photo.id),
           },
@@ -110,6 +111,14 @@ export default function DeletePhotosScreen() {
     setIsSelectMode((prev) => !prev);
     setSelectedIds(new Set());
   }, []);
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedIds.size === deletionPhotos.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(deletionPhotos.map((p) => p.id)));
+    }
+  }, [selectedIds.size, deletionPhotos]);
 
   const handleConfirmDelete = useCallback(async () => {
     const photosToDelete = isSelectMode
@@ -159,10 +168,10 @@ export default function DeletePhotosScreen() {
         }
         setSuccessModal({ visible: true, count: ids.length, freedBytes });
       } else {
-        Alert.alert("Error", "Could not delete photos.");
+        Alert.alert(t("common.error"), t("deleteScreen.errorDelete"));
       }
     } catch {
-      Alert.alert("Error", "An error occurred while deleting.");
+      Alert.alert(t("common.error"), t("deleteScreen.errorGeneric"));
     } finally {
       setIsDeleting(false);
     }
@@ -327,9 +336,9 @@ export default function DeletePhotosScreen() {
       <View style={styles.emptyIconGlow}>
         <Trash2 size={72} color="#ff6b6b" />
       </View>
-      <ThemedText style={styles.emptyTitle}>No photos to delete</ThemedText>
+      <ThemedText style={styles.emptyTitle}>{t("deleteScreen.emptyTitle")}</ThemedText>
       <ThemedText style={styles.emptySubtitle}>
-        Swipe left on photos you want to delete{"\n"}to see them here
+        {t("deleteScreen.emptySubtitle")}
       </ThemedText>
     </View>
   );
@@ -343,38 +352,41 @@ export default function DeletePhotosScreen() {
         <View>
           <ThemedText style={styles.title}>
             {isSelectMode
-              ? `${selectedIds.size} Selected`
-              : "Photos to Delete"}
+              ? t("deleteScreen.selectedCount", { count: selectedIds.size })
+              : t("deleteScreen.title")}
           </ThemedText>
           {!isSelectMode && (
             <ThemedText style={styles.count}>
-              {deletionPhotos.length}{" "}
-              {deletionPhotos.length === 1 ? "photo" : "photos"}
+              {t("deleteScreen.photoCount", { count: deletionPhotos.length })}
             </ThemedText>
           )}
         </View>
         {deletionPhotos.length > 0 && (
-          <Pressable onPress={toggleSelectMode} style={styles.selectButton}>
-            <ThemedText style={styles.selectButtonText}>
-              {isSelectMode ? "Cancel" : "Select"}
-            </ThemedText>
-          </Pressable>
+          <View style={styles.headerButtons}>
+            {isSelectMode && (
+              <Pressable onPress={handleSelectAll} style={styles.selectButton}>
+                <ThemedText style={styles.selectButtonText}>
+                  {selectedIds.size === deletionPhotos.length ? t("deleteScreen.deselectAll") : t("deleteScreen.selectAll")}
+                </ThemedText>
+              </Pressable>
+            )}
+            <Pressable onPress={toggleSelectMode} style={styles.selectButton}>
+              <ThemedText style={styles.selectButtonText}>
+                {isSelectMode ? t("common.cancel") : t("deleteScreen.select")}
+              </ThemedText>
+            </Pressable>
+          </View>
         )}
       </View>
 
       {/* Neon separator */}
-      <LinearGradient
-        colors={["rgba(255,107,107,0)", "rgba(255,107,107,0.5)", "rgba(255,107,107,0)"]}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 1, y: 0.5 }}
-        style={styles.headerSeparator}
-      />
+      <View style={[styles.headerSeparator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(255,107,107,0), rgba(255,107,107,0.5), rgba(255,107,107,0))' }]} />
 
       {deletionPhotos.length === 0 ? (
         renderEmptyState()
       ) : (
         <>
-          <ThemedText style={styles.hint}>Tap to preview · Tap the restore icon to undo</ThemedText>
+          <ThemedText style={styles.hint}>{t("deleteScreen.hint")}</ThemedText>
           <GestureDetector gesture={panGesture}>
             <View
               style={styles.listContainer}
@@ -411,14 +423,14 @@ export default function DeletePhotosScreen() {
               <View style={styles.bulkActionButtons}>
                 <Button
                   onPress={handleRestoreSelected}
-                  title={`Restore (${selectedIds.size})`}
+                  title={t("deleteScreen.restoreCount", { count: selectedIds.size })}
                   icon={<Undo2 size={20} color="#fff" />}
                   style={[styles.bulkButton, styles.bulkRestoreButton]}
                   variant="success"
                 />
                 <Button
                   onPress={handleConfirmDelete}
-                  title={isDeleting ? "Deleting..." : `Delete (${selectedIds.size})`}
+                  title={isDeleting ? t("deleteScreen.deleting") : t("deleteScreen.deleteCount", { count: selectedIds.size })}
                   icon={!isDeleting ? <Trash2 size={20} color="#fff" /> : undefined}
                   style={[styles.bulkButton, styles.bulkDeleteButton]}
                   variant="danger"
@@ -428,7 +440,7 @@ export default function DeletePhotosScreen() {
             ) : !isSelectMode ? (
               <Button
                 onPress={handleConfirmDelete}
-                title={isDeleting ? "Deleting..." : `Delete ${deletionPhotos.length} photos`}
+                title={isDeleting ? t("deleteScreen.deleting") : t("deleteScreen.deletePhotos", { count: deletionPhotos.length })}
                 icon={!isDeleting ? <Trash2 size={20} color="#fff" /> : undefined}
                 style={styles.deleteButton}
                 textStyle={styles.deleteButtonText}
@@ -452,12 +464,12 @@ export default function DeletePhotosScreen() {
         }}
         onDelete={(photo) => {
           Alert.alert(
-            "Delete permanently",
-            "This photo will be permanently deleted from your device.",
+            t("deleteScreen.deletePermanently"),
+            t("deleteScreen.deletePermanentlyMessage"),
             [
-              { text: "Cancel", style: "cancel" },
+              { text: t("common.cancel"), style: "cancel" },
               {
-                text: "Delete",
+                text: t("common.delete"),
                 style: "destructive",
                 onPress: async () => {
                   try {
@@ -470,7 +482,7 @@ export default function DeletePhotosScreen() {
                       removeDeletionPhoto(photo.id);
                     }
                   } catch {
-                    Alert.alert("Error", "Could not delete photo.");
+                    Alert.alert(t("common.error"), t("deleteScreen.errorDeleteSingle"));
                   }
                   setPreviewIndex(null);
                 },
@@ -543,17 +555,13 @@ const styles = StyleSheet.create({
   photoWrapper: {
     flex: 1,
     borderRadius: 10,
+    borderCurve: 'continuous',
     overflow: "hidden",
     borderWidth: 1,
     borderColor: "rgba(255,107,107,0.12)",
   },
   photoWrapperSelected: {
     borderColor: "rgba(255,107,107,0.6)",
-    shadowColor: "#ff6b6b",
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
   },
   photo: {
     width: "100%",
@@ -570,6 +578,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(0,0,0,0.6)",
     borderWidth: 1,
     borderColor: "rgba(74,222,128,0.3)",
@@ -586,11 +595,11 @@ const styles = StyleSheet.create({
   emptyIconGlow: {
     padding: 20,
     borderRadius: 60,
-    backgroundColor: "transparent",
-    shadowColor: "#ff6b6b",
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
+    backgroundColor: "rgba(255,107,107,0.01)",
+    shadowColor: '#ff6b6b',
     shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 30,
+    shadowOpacity: 0.4,
   },
   emptyTitle: {
     fontSize: 22,
@@ -625,16 +634,21 @@ const styles = StyleSheet.create({
   checkCircleSelected: {
     backgroundColor: "#ff6b6b",
     borderColor: "#ff6b6b",
-    shadowColor: "#ff6b6b",
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
+    shadowColor: '#ff6b6b',
     shadowOffset: { width: 0, height: 0 },
-    elevation: 10,
+    shadowRadius: 6,
+    shadowOpacity: 0.6,
+  },
+  headerButtons: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
   },
   selectButton: {
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
+    borderCurve: 'continuous',
     backgroundColor: "rgba(255,107,107,0.1)",
     borderWidth: 1,
     borderColor: "rgba(255,107,107,0.3)",
@@ -657,12 +671,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 16,
     borderRadius: 14,
+    borderCurve: 'continuous',
     gap: 8,
-    shadowColor: "#ff3b30",
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
+    shadowColor: '#ff3b30',
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    shadowRadius: 12,
+    shadowOpacity: 0.4,
   },
   deleteButtonText: {
     color: "#fff",
@@ -677,18 +691,21 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 16,
     borderRadius: 14,
+    borderCurve: 'continuous',
     gap: 8,
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
   },
   bulkRestoreButton: {
     backgroundColor: "#34c759",
-    shadowColor: "#34c759",
+    shadowColor: '#34c759',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+    shadowOpacity: 0.4,
   },
   bulkDeleteButton: {
     backgroundColor: "#ff3b30",
-    shadowColor: "#ff3b30",
+    shadowColor: '#ff3b30',
+    shadowOffset: { width: 0, height: 0 },
+    shadowRadius: 12,
+    shadowOpacity: 0.4,
   },
 });

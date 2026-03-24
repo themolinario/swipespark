@@ -34,7 +34,7 @@ class DuplicateDetectorModule : Module() {
         try {
           val results = java.util.concurrent.ConcurrentHashMap<String, String>(total)
           val completed = java.util.concurrent.atomic.AtomicInteger(0)
-          val semaphore = Semaphore(10)
+          val semaphore = Semaphore(20)
 
           val jobs = assetIds.map { assetId ->
             async {

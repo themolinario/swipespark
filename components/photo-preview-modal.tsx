@@ -10,6 +10,7 @@ import {
   View,
   ViewToken,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { X, Undo2, Trash2 } from "lucide-react-native";
 import { PhotoAsset } from "@/services/media-library.service";
@@ -21,7 +22,7 @@ interface PhotoPreviewModalProps {
   photos: PhotoAsset[];
   initialIndex: number;
   onClose: () => void;
-  variant: "kept" | "delete";
+  variant: "kept" | "delete" | "view-only";
   onRestore?: (photo: PhotoAsset) => void;
   onDelete?: (photo: PhotoAsset) => void;
 }
@@ -35,6 +36,7 @@ export function PhotoPreviewModal({
   onRestore,
   onDelete,
 }: PhotoPreviewModalProps) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
@@ -126,7 +128,7 @@ export function PhotoPreviewModal({
 
         {/* Action buttons */}
         <View style={[styles.actionsContainer, { paddingBottom: insets.bottom + 20 }]}>
-          {variant === "kept" ? (
+          {variant === "view-only" ? null : variant === "kept" ? (
             <Pressable
               style={[styles.actionButton, styles.restoreButton]}
               onPress={() => {
@@ -137,7 +139,7 @@ export function PhotoPreviewModal({
               hitSlop={8}
             >
               <Undo2 size={20} color="#fff" />
-              <Text style={styles.actionButtonText}>Remove from list</Text>
+              <Text style={styles.actionButtonText}>{t("preview.removeFromList")}</Text>
             </Pressable>
           ) : (
             <View style={styles.actionRow}>
@@ -151,7 +153,7 @@ export function PhotoPreviewModal({
                 hitSlop={8}
               >
                 <Undo2 size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Restore</Text>
+                <Text style={styles.actionButtonText}>{t("preview.restore")}</Text>
               </Pressable>
               <Pressable
                 style={[styles.actionButton, styles.deleteButton, styles.flex1]}
@@ -163,7 +165,7 @@ export function PhotoPreviewModal({
                 hitSlop={8}
               >
                 <Trash2 size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Delete</Text>
+                <Text style={styles.actionButtonText}>{t("preview.delete")}</Text>
               </Pressable>
             </View>
           )}
@@ -228,23 +230,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 14,
     borderRadius: 14,
+    borderCurve: 'continuous',
     gap: 8,
   },
   restoreButton: {
     backgroundColor: "#34c759",
-    shadowColor: "#34c759",
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowColor: '#34c759',
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    shadowRadius: 10,
+    shadowOpacity: 0.4,
   },
   deleteButton: {
     backgroundColor: "#ff3b30",
-    shadowColor: "#ff3b30",
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
+    shadowColor: '#ff3b30',
     shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    shadowRadius: 10,
+    shadowOpacity: 0.4,
   },
   actionButtonText: {
     color: "#fff",

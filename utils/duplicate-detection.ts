@@ -43,23 +43,52 @@ export function findDuplicates(photos: PhotoAsset[]): DuplicateGroup[] {
 
 /**
  * Groups a list of photos into sets of duplicates based on a pre-computed hash map.
+ * Photos that couldn't be hashed fall back to filename + dimensions grouping.
  */
 export function findDuplicatesByHash(
     photos: PhotoAsset[],
     hashedAssets: Record<string, string>
 ): DuplicateGroup[] {
     const groups = new Map<string, PhotoAsset[]>();
+    const unhashedPhotos: PhotoAsset[] = [];
 
     for (const photo of photos) {
         const hash = hashedAssets[photo.id];
-        // If it doesn't have a hash, it wasn't processed yet or failed, skip or use fallback
-        if (!hash) continue;
+        if (!hash) {
+            unhashedPhotos.push(photo);
+            continue;
+        }
 
         if (!groups.has(hash)) {
             groups.set(hash, []);
         }
 
         groups.get(hash)!.push(photo);
+    }
+
+    const hashedIds = new Set<string>();
+    for (const groupPhotos of groups.values()) {
+        if (groupPhotos.length > 1) {
+            for (const p of groupPhotos) {
+                hashedIds.add(p.id);
+            }
+        }
+    }
+
+    const fallbackGroups = new Map<string, PhotoAsset[]>();
+    for (const photo of unhashedPhotos) {
+        if (hashedIds.has(photo.id)) continue;
+        const key = `fallback_${photo.filename}_${photo.width}_${photo.height}`;
+        if (!fallbackGroups.has(key)) {
+            fallbackGroups.set(key, []);
+        }
+        fallbackGroups.get(key)!.push(photo);
+    }
+
+    for (const [key, photos] of fallbackGroups.entries()) {
+        if (photos.length > 1) {
+            groups.set(key, photos);
+        }
     }
 
     const duplicates: DuplicateGroup[] = [];
