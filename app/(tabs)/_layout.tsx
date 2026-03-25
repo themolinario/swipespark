@@ -1,5 +1,5 @@
 import { FuturisticTabBar } from "@/components/ui/futuristic-tab-bar";
-import { Images, Heart, Trash2, Copy, Wand2 } from "lucide-react-native";
+import { Images, Heart, Trash2, Wrench, Settings } from "lucide-react-native";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -41,22 +41,30 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="duplicates"
+        name="tools"
         options={{
-          title: t("tabs.dupes"),
+          title: t("tabs.tools"),
           tabBarIcon: ({ color, size }) => (
-            <Copy size={size} color={color} />
+            <Wrench size={size} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="smart-clean"
+        name="settings"
         options={{
-          title: t("tabs.smart"),
+          title: t("tabs.settings"),
           tabBarIcon: ({ color, size }) => (
-            <Wand2 size={size} color={color} />
+            <Settings size={size} color={color} />
           ),
         }}
+      />
+      <Tabs.Screen
+        name="duplicates"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="smart-clean"
+        options={{ href: null }}
       />
     </Tabs>
   );

@@ -52,7 +52,7 @@ const COLUMN_COUNT = 3;
 const GAP = 3;
 const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
 
-export default function SmartCleanScreen() {
+export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
     const { t } = useTranslation();
     const insets = useSafeAreaInsets();
     const tabBarHeight = useBottomTabBarHeight();
@@ -493,6 +493,11 @@ export default function SmartCleanScreen() {
                 >
                     <View style={styles.headerTextContainer}>
                         <View style={styles.headerRow}>
+                            {onBack && (
+                                <Pressable onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(74,222,128,0.1)", borderWidth: 1, borderColor: "rgba(74,222,128,0.3)", justifyContent: "center", alignItems: "center" }}>
+                                    <ArrowLeft size={22} color="#4ade80" />
+                                </Pressable>
+                            )}
                             <View style={styles.headerIconGlow}>
                                 <Wand2 size={24} color="#4ade80" />
                             </View>
@@ -1067,3 +1072,7 @@ const styles = StyleSheet.create({
         marginTop: 8,
     },
 });
+
+export default function SmartCleanScreen() {
+    return <SmartCleanContent />;
+}

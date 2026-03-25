@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { useDuplicates } from "@/hooks/use-duplicates";
 import { DuplicateGroup } from "@/utils/duplicate-detection";
-import { Check, AlertCircle, Images, RefreshCcw, Search, Zap, XCircle, Trash2 } from "lucide-react-native";
+import { ArrowLeft, Check, AlertCircle, Images, RefreshCcw, Search, Zap, XCircle, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -31,7 +31,7 @@ const PHOTO_SIZE = Math.floor(
     (SCREEN_WIDTH - PADDING * 2 - (GROUP_PADDING + GROUP_BORDER) * 2 - GAP * (COLUMNS - 1)) / COLUMNS
 );
 
-export default function DuplicatesScreen() {
+export function DuplicatesContent({ onBack }: { onBack?: () => void }) {
     const { t } = useTranslation();
     const tabBarHeight = useBottomTabBarHeight();
     const insets = useSafeAreaInsets();
@@ -407,13 +407,20 @@ export default function DuplicatesScreen() {
         >
             {/* Header */}
             <View style={styles.header}>
-                <View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {onBack && (
+                        <Pressable onPress={onBack} style={styles.actionIcon}>
+                            <ArrowLeft size={22} color="#4ade80" />
+                        </Pressable>
+                    )}
+                    <View>
                     <ThemedText style={styles.title}>{t("duplicates.title")}</ThemedText>
                     {!isScanning && duplicateGroups.length > 0 && (
                         <ThemedText style={styles.count}>
                             {t("duplicates.groupsFound", { count: duplicateGroups.length })}
                         </ThemedText>
                     )}
+                    </View>
                 </View>
                 {!isScanning && duplicateGroups.length > 0 && (
                     <Pressable onPress={() => scanDuplicates(true)} style={styles.actionIcon}>
@@ -741,3 +748,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
 });
+
+export default function DuplicatesScreen() {
+    return <DuplicatesContent />;
+}

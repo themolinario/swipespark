@@ -71,6 +71,7 @@ export function FuturisticTabBar({
       <View style={styles.tabsContainer}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
+          if (options.href === null || !options.tabBarIcon) return null;
           const isFocused = state.index === index;
 
           const label =
@@ -305,6 +306,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     letterSpacing: 0.3,
+    lineHeight: 14,
     marginTop: 2,
     textTransform: "uppercase",
   },
