@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "modules": ["DiskInfoModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.diskinfo.DiskInfoModule"]
+  }
+}

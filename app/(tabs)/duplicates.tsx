@@ -1,3 +1,4 @@
+import { DeletionSuccessModal } from "@/components/deletion-success-modal";
 import { ThemedText } from "@/components/themed-text";
 import { AnimatedScanner } from "@/components/ui/animated-scanner";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,11 @@ export default function DuplicatesScreen() {
 
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [isDeleting, setIsDeleting] = useState(false);
+    const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number; freedBytes: number }>({
+        visible: false,
+        count: 0,
+        freedBytes: 0,
+    });
 
     const flatPhotos = duplicateGroups.flatMap(g => g.photos);
 
@@ -107,14 +113,14 @@ export default function DuplicatesScreen() {
         setIsDeleting(true);
         try {
             const idsToDelete = Array.from(selectedIds);
-            const success = await deleteDuplicates(idsToDelete);
+            const urisToDelete = flatPhotos
+                .filter((p) => selectedIds.has(p.id))
+                .map((p) => p.uri);
+            const result = await deleteDuplicates(idsToDelete, urisToDelete);
 
-            if (success) {
+            if (result.success) {
                 setSelectedIds(new Set());
-                Alert.alert(
-                    t("duplicates.success"),
-                    t("duplicates.deletedMessage", { count: idsToDelete.length })
-                );
+                setSuccessModal({ visible: true, count: idsToDelete.length, freedBytes: result.freedBytes });
             } else {
                 Alert.alert(t("common.error"), t("duplicates.errorDelete"));
             }
@@ -123,7 +129,7 @@ export default function DuplicatesScreen() {
         } finally {
             setIsDeleting(false);
         }
-    }, [selectedIds, deleteDuplicates]);
+    }, [selectedIds, deleteDuplicates, flatPhotos]);
 
     // --- Drag to Select Logic ---
 
@@ -482,6 +488,12 @@ export default function DuplicatesScreen() {
                     )}
                 </>
             )}
+            <DeletionSuccessModal
+                visible={successModal.visible}
+                deletedCount={successModal.count}
+                freedBytes={successModal.freedBytes}
+                onClose={() => setSuccessModal({ visible: false, count: 0, freedBytes: 0 })}
+            />
         </FuturisticHomeBackground>
     );
 }

@@ -1,7 +1,10 @@
+import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import { mediaLibraryService } from "@/services/media-library.service";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { usePhotoStore } from "@/stores/photo-store";
+import { useStatsStore } from "@/stores/stats-store";
 import { useCallback, useEffect, useState } from "react";
+import { Platform } from "react-native";
 
 export function useDuplicates() {
     const duplicateGroups = useDuplicateStore((s) => s.duplicateGroups);
@@ -33,23 +36,30 @@ export function useDuplicates() {
         startScan(forceRefresh);
     }, [startScan]);
 
-    const deleteDuplicates = useCallback(async (photoIds: string[]) => {
-        if (photoIds.length === 0) return true;
+    const deleteDuplicates = useCallback(async (photoIds: string[], photoUris?: string[]): Promise<{ success: boolean; freedBytes: number }> => {
+        if (photoIds.length === 0) return { success: true, freedBytes: 0 };
 
         try {
+            let freedBytes = 0;
+            try {
+                freedBytes = await getAssetsSizeByIds(photoIds);
+                if (freedBytes <= 0 && photoUris) {
+                    freedBytes = await getAssetsSize(photoUris);
+                }
+            } catch {
+            }
+
             const success = await mediaLibraryService.deleteAssets(photoIds);
             if (success) {
-                // Update local visual UI state
                 useDuplicateStore.getState().removeDuplicatesLocally(photoIds);
-                // Ensure they don't appear in Kept/Delete tabs anymore
                 usePhotoStore.getState().removePhotosPermanently(photoIds);
-                // Notify usePhotos (index) about permanent deletion
                 usePhotoStore.getState().bumpDeletionVersion();
+                useStatsStore.getState().recordDeletion(photoIds.length, freedBytes);
             }
-            return success;
+            return { success, freedBytes };
         } catch (error) {
             console.error("Failed to delete duplicate photos:", error);
-            return false;
+            return { success: false, freedBytes: 0 };
         }
     }, []);
 

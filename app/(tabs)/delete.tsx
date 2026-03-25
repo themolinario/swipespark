@@ -10,6 +10,7 @@ import {
 } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
+import { useStatsStore } from "@/stores/stats-store";
 import { Check, Undo2, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
@@ -152,12 +153,10 @@ export default function DeletePhotosScreen() {
       const success = await mediaLibraryService.deleteAssets(ids);
 
       if (success) {
-        // Update duplicate store – remove deleted photos from duplicate groups
         useDuplicateStore.getState().removeDuplicatesLocally(ids);
-        // Remove from kept list too (in case they were also kept)
         usePhotoStore.getState().removePhotosPermanently(ids);
-        // Notify usePhotos (index) about permanent deletion
         usePhotoStore.getState().bumpDeletionVersion();
+        useStatsStore.getState().recordDeletion(ids.length, freedBytes);
 
         if (isSelectMode) {
           ids.forEach((id) => removeDeletionPhoto(id));

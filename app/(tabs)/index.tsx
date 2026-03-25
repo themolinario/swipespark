@@ -9,6 +9,7 @@ import { usePhotos } from "@/hooks/use-photos";
 import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
+import { useStatsStore } from "@/stores/stats-store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
 import { Trash2, Undo2 } from "lucide-react-native";
@@ -108,8 +109,8 @@ export default function HomeScreen() {
     const ids = deletionPhotos.map((p) => p.id);
     const success = await confirmDeletion();
     if (success) {
-      // Update duplicate store – remove deleted photos from duplicate groups
       useDuplicateStore.getState().removeDuplicatesLocally(ids);
+      useStatsStore.getState().recordDeletion(count, freedBytes);
       clearDeletionPhotos();
       setSuccessModal({ visible: true, count, freedBytes });
     }

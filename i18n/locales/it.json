@@ -117,6 +117,13 @@
   "deletionSuccess.subtitle_one": "{{count}} foto eliminata definitivamente",
   "deletionSuccess.subtitle_other": "{{count}} foto eliminate definitivamente",
   "deletionSuccess.spaceFreed": "Spazio liberato",
+  "deletionSuccess.deviceStorage": "Spazio dispositivo",
+  "deletionSuccess.used": "{{size}} usati",
+  "deletionSuccess.available": "{{size}} liberi",
+  "deletionSuccess.total": "Totale: {{size}}",
+  "deletionSuccess.lifetimeStats": "Dall'installazione",
+  "deletionSuccess.photosDeleted": "foto eliminate",
+  "deletionSuccess.totalFreed": "spazio liberato",
   "deletionSuccess.close": "Ottimo!",
 
   "confirmDeletion.title": "Eliminare {{count}} foto?",
