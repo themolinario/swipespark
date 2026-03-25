@@ -93,6 +93,9 @@
   "duplicates.grantPermission": "Concedi permesso",
   "duplicates.noDuplicatesFound": "Nessun duplicato trovato",
   "duplicates.noDuplicatesMessage": "Non abbiamo trovato copie esatte nella tua libreria.",
+  "duplicates.startScan": "Avvia scansione",
+  "duplicates.startScanTitle": "Trova duplicati",
+  "duplicates.startScanMessage": "Scansiona la libreria per trovare foto duplicate esatte.",
   "duplicates.scanAgain": "Scansiona di nuovo",
   "duplicates.autoSelect": "Auto-seleziona",
   "duplicates.clear": "Cancella",
@@ -135,6 +138,7 @@
   "preview.delete": "Elimina",
 
   "common.cancel": "Annulla",
+  "common.stop": "Stop",
   "common.error": "Errore",
   "common.delete": "Elimina"
 }

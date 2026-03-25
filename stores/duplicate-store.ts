@@ -12,6 +12,7 @@ interface DuplicateStore {
     isScanning: boolean;
     progress: number;
     scanStatusText: string;
+    hasScannedOnce: boolean;
 
     startScan: (forceRefresh?: boolean) => Promise<void>;
     removeDuplicatesLocally: (ids: string[]) => void;
@@ -29,6 +30,7 @@ export const useDuplicateStore = create<DuplicateStore>()(
             isScanning: false,
             progress: 0,
             scanStatusText: "",
+            hasScannedOnce: false,
 
             removeDuplicatesLocally: (ids: string[]) => {
                 set((state) => {
@@ -104,7 +106,7 @@ export const useDuplicateStore = create<DuplicateStore>()(
                     console.log(`[DuplicateStore] Found ${photosToHash.length} potential duplicate candidates by dimension.`);
 
                     if (photosToHash.length === 0) {
-                        set({ duplicateGroups: [], hashedAssets: {}, progress: 1, isScanning: false, scanStatusText: "Complete" });
+                        set({ duplicateGroups: [], hashedAssets: {}, progress: 1, isScanning: false, scanStatusText: "Complete", hasScannedOnce: true });
                         return;
                     }
 
@@ -148,7 +150,7 @@ export const useDuplicateStore = create<DuplicateStore>()(
                     console.log(`[DuplicateStore] Native hashing complete. Grouping matches...`);
 
                     const duplicates = findDuplicatesByHash(photosToHash, currentHashes);
-                    set({ duplicateGroups: duplicates, progress: 1, isScanning: false, scanStatusText: "Complete" });
+                    set({ duplicateGroups: duplicates, progress: 1, isScanning: false, scanStatusText: "Complete", hasScannedOnce: true });
 
                 } catch (error) {
                     console.error("Failed to scan for duplicates:", error);
@@ -161,6 +163,7 @@ export const useDuplicateStore = create<DuplicateStore>()(
             storage: createJSONStorage(() => AsyncStorage),
             partialize: (state) => ({
                 hashedAssets: state.hashedAssets,
+                hasScannedOnce: state.hasScannedOnce,
             }),
         }
     )

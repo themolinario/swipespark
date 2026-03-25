@@ -12,6 +12,7 @@ export function useDuplicates() {
     const progress = useDuplicateStore((s) => s.progress);
     const scanStatusText = useDuplicateStore((s) => s.scanStatusText);
     const startScan = useDuplicateStore((s) => s.startScan);
+    const hasScannedOnce = useDuplicateStore((s) => s.hasScannedOnce);
 
     const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
@@ -69,6 +70,7 @@ export function useDuplicates() {
         progress,
         scanStatusText,
         hasPermission,
+        hasScannedOnce,
         scanDuplicates,
         deleteDuplicates,
     };

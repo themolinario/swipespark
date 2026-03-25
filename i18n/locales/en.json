@@ -93,6 +93,9 @@
   "duplicates.grantPermission": "Grant Permission",
   "duplicates.noDuplicatesFound": "No Duplicates Found",
   "duplicates.noDuplicatesMessage": "We couldn't find any exact copies in your library.",
+  "duplicates.startScan": "Start Scan",
+  "duplicates.startScanTitle": "Find Duplicates",
+  "duplicates.startScanMessage": "Scan your library to find exact duplicate photos.",
   "duplicates.scanAgain": "Scan Again",
   "duplicates.autoSelect": "Auto-Select",
   "duplicates.clear": "Clear",
@@ -135,6 +138,7 @@
   "preview.delete": "Delete",
 
   "common.cancel": "Cancel",
+  "common.stop": "Stop",
   "common.error": "Error",
   "common.delete": "Delete"
 }

@@ -7,7 +7,7 @@ import { useClassificationCache, CachedLabel } from "@/stores/classification-cac
 import { usePhotoStore } from "@/stores/photo-store";
 import { PhotoAsset } from "@/services/media-library.service";
 import { mapLabelsToCategory, matchesCustomQuery, SmartCategory, LabelWithConfidence } from "@/utils/category-mapper";
-import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, Check, Wand2, X, Trash2 } from "lucide-react-native";
+import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, Check, Wand2, X, Trash2, Square } from "lucide-react-native";
 import { Image } from "expo-image";
 import * as MediaLibrary from "expo-media-library";
 import { router } from "expo-router";
@@ -111,7 +111,7 @@ export default function SmartCleanScreen() {
         if (!hasNextPageRef.current || scanId !== scanIdRef.current) return;
 
         setIsLoadingMore(true);
-        const newlyFound: MediaLibrary.Asset[] = [];
+        let newlyFoundCount = 0;
         const totalEstimate = totalAssetsEstimateRef.current;
 
         try {
@@ -149,11 +149,16 @@ export default function SmartCleanScreen() {
                     }
                 }
 
+                const cachedMatches: MediaLibrary.Asset[] = [];
                 for (const { asset, labels } of cachedAssets) {
                     totalProcessedRef.current++;
                     if (checkMatch(category, labels)) {
-                        newlyFound.push(asset);
+                        cachedMatches.push(asset);
                     }
+                }
+                if (cachedMatches.length > 0) {
+                    newlyFoundCount += cachedMatches.length;
+                    setMatchedPhotos(prev => [...prev, ...cachedMatches]);
                 }
 
                 for (let i = 0; i < uncachedAssets.length && scanId === scanIdRef.current; i += NATIVE_BATCH_SIZE) {
@@ -166,6 +171,7 @@ export default function SmartCleanScreen() {
                         if (scanId !== scanIdRef.current) break;
 
                         const cacheEntries: { assetId: string; labels: CachedLabel[] }[] = [];
+                        const batchMatches: MediaLibrary.Asset[] = [];
 
                         for (let j = 0; j < results.length; j++) {
                             const result = results[j];
@@ -182,7 +188,7 @@ export default function SmartCleanScreen() {
                             }
 
                             if (checkMatch(category, labels)) {
-                                newlyFound.push(asset);
+                                batchMatches.push(asset);
                             }
 
                             totalProcessedRef.current++;
@@ -190,6 +196,11 @@ export default function SmartCleanScreen() {
 
                         if (cacheEntries.length > 0) {
                             setCachedLabelsBatch(cacheEntries);
+                        }
+
+                        if (batchMatches.length > 0) {
+                            newlyFoundCount += batchMatches.length;
+                            setMatchedPhotos(prev => [...prev, ...batchMatches]);
                         }
                     } catch (e) {
                         console.error("[SmartClean] Batch classification FAILED:", e);
@@ -200,7 +211,7 @@ export default function SmartCleanScreen() {
 
                     const progressPct = Math.min((totalProcessedRef.current / totalEstimate) * 100, 99);
                     setProgress(progressPct);
-                    setScanStatusText(t("smart.scanProgress", { processed: totalProcessedRef.current, total: totalEstimate, found: newlyFound.length }));
+                    setScanStatusText(t("smart.scanProgress", { processed: totalProcessedRef.current, total: totalEstimate, found: newlyFoundCount }));
 
                     await new Promise(resolve => setTimeout(resolve, 0));
                 }
@@ -208,7 +219,7 @@ export default function SmartCleanScreen() {
                 hasNextPageRef.current = page.hasNextPage;
                 endCursorRef.current = page.endCursor;
 
-                if (newlyFound.length >= DISPLAY_BATCH_SIZE || !hasNextPageRef.current) {
+                if (newlyFoundCount >= DISPLAY_BATCH_SIZE || !hasNextPageRef.current) {
                     break;
                 }
             }
@@ -220,7 +231,6 @@ export default function SmartCleanScreen() {
                 setProgress(100);
             }
 
-            setMatchedPhotos(prev => [...prev, ...newlyFound]);
             setStep("REVIEW_RESULTS");
 
         } catch (e) {
@@ -591,11 +601,12 @@ export default function SmartCleanScreen() {
                     style={({ pressed }) => [styles.cancelButton, pressed && { opacity: 0.7 }]}
                     onPress={() => {
                         cancelScan();
-                        setStep("SELECT_CATEGORY");
+                        setScanComplete(true);
+                        setStep("REVIEW_RESULTS");
                     }}
                 >
-                    <X size={18} color="#ff6b6b" />
-                    <Text style={styles.cancelButtonText}>{t("common.cancel")}</Text>
+                    <Square size={16} color="#ff6b6b" />
+                    <Text style={styles.cancelButtonText}>{t("common.stop")}</Text>
                 </Pressable>
             </FuturisticHomeBackground>
         );

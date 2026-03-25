@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { useDuplicates } from "@/hooks/use-duplicates";
 import { DuplicateGroup } from "@/utils/duplicate-detection";
-import { Check, AlertCircle, Images, RefreshCcw, Zap, XCircle, Trash2 } from "lucide-react-native";
+import { Check, AlertCircle, Images, RefreshCcw, Search, Zap, XCircle, Trash2 } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -42,6 +42,7 @@ export default function DuplicatesScreen() {
         progress,
         scanStatusText,
         hasPermission,
+        hasScannedOnce,
         scanDuplicates,
         deleteDuplicates,
     } = useDuplicates();
@@ -73,11 +74,11 @@ export default function DuplicatesScreen() {
     const groupHeaderHeights = useRef<Map<string, number>>(new Map());
 
     useEffect(() => {
-        if (duplicateGroups.length === 0 && !isScanning) {
+        if (!hasScannedOnce && duplicateGroups.length === 0 && !isScanning) {
             scanDuplicates();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [hasScannedOnce]);
 
     const handleToggleSelect = useCallback((id: string) => {
         setSelectedIds((prev) => {
@@ -384,13 +385,17 @@ export default function DuplicatesScreen() {
                 <View style={styles.emptyIconGlow}>
                     <Images size={72} color="#4ade80" />
                 </View>
-                <ThemedText style={styles.emptyTitle}>{t("duplicates.noDuplicatesFound")}</ThemedText>
-                <ThemedText style={styles.emptySubtitle}>
-                    {t("duplicates.noDuplicatesMessage")}
+                <ThemedText style={styles.emptyTitle}>
+                    {hasScannedOnce ? t("duplicates.noDuplicatesFound") : t("duplicates.startScanTitle")}
                 </ThemedText>
-                <Pressable onPress={() => scanDuplicates(true)} style={styles.scanAgainButton}>
-                    <RefreshCcw size={20} color="#4ade80" />
-                    <ThemedText style={styles.scanAgainText}>{t("duplicates.scanAgain")}</ThemedText>
+                <ThemedText style={styles.emptySubtitle}>
+                    {hasScannedOnce ? t("duplicates.noDuplicatesMessage") : t("duplicates.startScanMessage")}
+                </ThemedText>
+                <Pressable onPress={() => scanDuplicates(hasScannedOnce)} style={styles.scanAgainButton}>
+                    {hasScannedOnce ? <RefreshCcw size={20} color="#4ade80" /> : <Search size={20} color="#4ade80" />}
+                    <ThemedText style={styles.scanAgainText}>
+                        {hasScannedOnce ? t("duplicates.scanAgain") : t("duplicates.startScan")}
+                    </ThemedText>
                 </Pressable>
             </View>
         );
