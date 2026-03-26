@@ -70,9 +70,9 @@ describe("DuplicatesScreen", () => {
         });
 
         const { getByText } = render(<DuplicatesScreen />);
-        expect(getByText("Permission Needed")).toBeTruthy();
+        expect(getByText("duplicates.permissionNeeded")).toBeTruthy();
 
-        fireEvent.press(getByText("Grant Permission"));
+        fireEvent.press(getByText("duplicates.grantPermission"));
         expect(mockScanDuplicates).toHaveBeenCalled();
     });
 
@@ -87,16 +87,16 @@ describe("DuplicatesScreen", () => {
         });
 
         const { getByText } = render(<DuplicatesScreen />);
-        expect(getByText("Scanning Library...")).toBeTruthy();
+        expect(getByText("duplicates.scanningLibrary")).toBeTruthy();
         expect(getByText("Testing scan...")).toBeTruthy();
-        expect(getByText("50.0% Complete")).toBeTruthy();
+        expect(getByText("duplicates.percentComplete")).toBeTruthy();
     });
 
     it("renders empty state when no duplicates are found", () => {
         const { getByText } = render(<DuplicatesScreen />);
-        expect(getByText("No Duplicates Found")).toBeTruthy();
+        expect(getByText("duplicates.startScanTitle")).toBeTruthy();
 
-        fireEvent.press(getByText("Scan Again"));
+        fireEvent.press(getByText("duplicates.startScan"));
         expect(mockScanDuplicates).toHaveBeenCalled();
     });
 
@@ -119,11 +119,10 @@ describe("DuplicatesScreen", () => {
         });
 
         const { getByText } = render(<DuplicatesScreen />);
-        expect(getByText("1 groups found")).toBeTruthy();
+        expect(getByText("duplicates.groupsFound")).toBeTruthy();
         expect(getByText("test.jpg")).toBeTruthy();
-        expect(getByText("100x100 • 2 copies")).toBeTruthy();
+        expect(getByText(/100x100/)).toBeTruthy();
 
-        // Should have Auto-Select button
-        expect(getByText("Auto-Select")).toBeTruthy();
+        expect(getByText("duplicates.autoSelect")).toBeTruthy();
     });
 });

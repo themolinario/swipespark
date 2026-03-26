@@ -126,6 +126,7 @@ export default function SettingsScreen() {
                         {LANGUAGES.map((lang) => (
                             <Pressable
                                 key={lang.code}
+                                testID={`language-${lang.code}`}
                                 style={[styles.languageRow, currentLang === lang.code && styles.languageRowActive]}
                                 onPress={() => handleLanguageChange(lang.code)}
                             >

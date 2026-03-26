@@ -49,6 +49,29 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock')
 );
 
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+  Trans: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+jest.mock('@/hooks/use-color-scheme', () => ({
+  useColorScheme: () => 'dark',
+}));
+
+jest.mock('@/modules/disk-info', () => ({
+  getDiskInfo: () => ({ total: 128000000000, available: 64000000000 }),
+}));
+
+jest.mock('expo-glass-effect', () => ({
+  GlassView: 'GlassView',
+}));
+
+jest.mock('@/modules/image-classifier', () => ({
+  default: {
+    classifyImage: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 jest.mock('@/modules/duplicate-detector', () => ({
   DuplicateDetectorModule: {
     computeHashes: jest.fn().mockResolvedValue({}),

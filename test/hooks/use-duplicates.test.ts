@@ -97,7 +97,7 @@ describe("useDuplicates", () => {
                 success = await result.current.deleteDuplicates([]);
             });
 
-            expect(success).toBe(true);
+            expect(success).toEqual({ success: true, freedBytes: 0 });
             expect(mediaLibraryService.deleteAssets).not.toHaveBeenCalled();
         });
 
@@ -112,12 +112,12 @@ describe("useDuplicates", () => {
 
             const { result } = renderHook(() => useDuplicates());
 
-            let success;
+            let response;
             await act(async () => {
-                success = await result.current.deleteDuplicates(["id1", "id2"]);
+                response = await result.current.deleteDuplicates(["id1", "id2"]);
             });
 
-            expect(success).toBe(true);
+            expect(response).toMatchObject({ success: true });
             expect(mediaLibraryService.deleteAssets).toHaveBeenCalledWith(["id1", "id2"]);
             expect(removeDuplicatesLocallyMock).toHaveBeenCalledWith(["id1", "id2"]);
             expect(removePhotosPermanentlyMock).toHaveBeenCalledWith(["id1", "id2"]);
@@ -132,12 +132,12 @@ describe("useDuplicates", () => {
 
             const { result } = renderHook(() => useDuplicates());
 
-            let success;
+            let response;
             await act(async () => {
-                success = await result.current.deleteDuplicates(["id1"]);
+                response = await result.current.deleteDuplicates(["id1"]);
             });
 
-            expect(success).toBe(false);
+            expect(response).toMatchObject({ success: false });
             expect(removeDuplicatesLocallyMock).not.toHaveBeenCalled();
             consoleSpy.mockRestore();
         });

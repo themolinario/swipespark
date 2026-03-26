@@ -85,7 +85,7 @@ export default function WelcomeScreen() {
 
         <Animated.View style={[styles.buttonWrapper, buttonAnimatedStyle]}>
           <Animated.View style={[styles.buttonGlowBackground, buttonGlowAnimatedStyle]} pointerEvents="none" />
-          <Pressable onPress={completeOnboarding} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
+          <Pressable testID="start-button" onPress={completeOnboarding} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
             <View style={[styles.buttonGradient, { experimental_backgroundImage: 'linear-gradient(to right, rgba(66, 245, 135, 0.18), rgba(33, 90, 58, 0.18), rgba(56, 224, 210, 0.12))' }]} />
             <View style={styles.buttonInnerBorder}>
               <ThemedText style={styles.buttonText}>{t("welcome.startButton")}</ThemedText>

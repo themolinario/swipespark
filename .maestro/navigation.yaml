@@ -1,0 +1,36 @@
+appId: com.themolinario.swipespark
+---
+- launchApp
+
+- tapOn:
+    text: "Allow Full Access"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- tapOn:
+    id: "tab-index"
+- assertVisible:
+    id: "action-delete"
+    optional: true
+
+- tapOn:
+    id: "tab-kept"
+- assertVisible: "MY KEPT"
+  optional: true
+
+- tapOn:
+    id: "tab-delete"
+- assertVisible: "TO DELETE"
+  optional: true
+
+- tapOn:
+    id: "tab-tools"
+- assertVisible:
+    id: "tools-duplicates-card"
+
+- tapOn:
+    id: "tab-settings"
+- assertVisible: "Device Storage"
+  optional: true

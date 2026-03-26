@@ -22,6 +22,7 @@ interface ButtonProps {
   textStyle?: StyleProp<TextStyle>;
   variant?: ButtonVariant;
   disabled?: boolean;
+  testID?: string;
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -32,6 +33,7 @@ export const Button: React.FC<ButtonProps> = ({
   textStyle,
   variant = "primary",
   disabled = false,
+  testID,
 }) => {
   const colorScheme = useColorScheme() ?? "light";
   const colors = Colors[colorScheme];
@@ -68,6 +70,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <Pressable
+      testID={testID}
       onPress={handlePress}
       disabled={disabled}
       style={({ pressed }) => [

@@ -102,6 +102,7 @@ export function FuturisticTabBar({
           return (
             <TabItem
               key={route.key}
+              testID={`tab-${route.name}`}
               isFocused={isFocused}
               label={label}
               onPress={onPress}
@@ -120,6 +121,7 @@ export function FuturisticTabBar({
 // ─── Single Tab Item ─────────────────────────────────────────────
 
 interface TabItemProps {
+  testID?: string;
   isFocused: boolean;
   label: string;
   onPress: () => void;
@@ -130,6 +132,7 @@ interface TabItemProps {
 }
 
 function TabItem({
+  testID,
   isFocused,
   label,
   onPress,
@@ -191,6 +194,7 @@ function TabItem({
 
   return (
     <Pressable
+      testID={testID}
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole="button"

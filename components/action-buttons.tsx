@@ -35,14 +35,16 @@ export const ActionButtons = memo(function ActionButtons({
   return (
     <View style={styles.container}>
       <Button
+        testID="action-delete"
         onPress={handleDelete}
         icon={<Trash2 size={30} color="#ff3b30" />}
-        variant="secondary" // Use secondary to prevent default primary background
-        style={[styles.button, styles.deleteButton]} // We will override styles completely
+        variant="secondary"
+        style={[styles.button, styles.deleteButton]}
       />
 
       {canUndo && (
         <Button
+          testID="action-undo"
           onPress={handleUndo}
           icon={<Undo2 size={24} color="#ffffff" />}
           variant="secondary"
@@ -51,6 +53,7 @@ export const ActionButtons = memo(function ActionButtons({
       )}
 
       <Button
+        testID="action-keep"
         onPress={handleKeep}
         icon={<Heart size={32} color="#4ade80" />}
         variant="secondary"

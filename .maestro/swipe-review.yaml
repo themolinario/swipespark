@@ -1,0 +1,31 @@
+appId: com.themolinario.swipespark
+---
+- launchApp
+
+- tapOn:
+    text: "Allow Full Access"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- tapOn:
+    id: "tab-index"
+
+- swipe:
+    direction: LEFT
+    duration: 400
+
+- swipe:
+    direction: RIGHT
+    duration: 400
+
+- tapOn:
+    id: "action-delete"
+
+- tapOn:
+    id: "action-keep"
+
+- tapOn:
+    id: "action-undo"
+    optional: true

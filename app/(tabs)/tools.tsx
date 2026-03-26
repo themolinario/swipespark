@@ -38,6 +38,7 @@ export default function ToolsScreen() {
 
             <View style={styles.cardsContainer}>
                 <Pressable
+                    testID="tools-duplicates-card"
                     style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                     onPress={() => setActiveView("duplicates")}
                 >
@@ -51,6 +52,7 @@ export default function ToolsScreen() {
                 </Pressable>
 
                 <Pressable
+                    testID="tools-smartclean-card"
                     style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                     onPress={() => setActiveView("smart-clean")}
                 >

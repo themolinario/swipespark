@@ -1,0 +1,16 @@
+appId: com.themolinario.swipespark
+---
+- clearState
+- launchApp
+
+- assertVisible: "START CLEANING"
+
+- tapOn:
+    id: "start-button"
+
+- tapOn:
+    text: "Allow Full Access"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true

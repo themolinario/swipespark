@@ -1,0 +1,31 @@
+appId: com.themolinario.swipespark
+---
+- launchApp
+
+- tapOn:
+    text: "Allow Full Access"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- tapOn:
+    id: "tab-tools"
+- assertVisible:
+    id: "tools-duplicates-card"
+
+- tapOn:
+    id: "tools-duplicates-card"
+
+- tapOn:
+    id: "duplicates-back-button"
+- assertVisible:
+    id: "tools-duplicates-card"
+
+- tapOn:
+    id: "tools-smartclean-card"
+
+- tapOn:
+    id: "smartclean-back-button"
+- assertVisible:
+    id: "tools-duplicates-card"

@@ -498,7 +498,7 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                     <View style={styles.headerTextContainer}>
                         <View style={styles.headerRow}>
                             {onBack && (
-                                <Pressable onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(74,222,128,0.1)", borderWidth: 1, borderColor: "rgba(74,222,128,0.3)", justifyContent: "center", alignItems: "center" }}>
+                                <Pressable testID="smartclean-back-button" onPress={onBack} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: "rgba(74,222,128,0.1)", borderWidth: 1, borderColor: "rgba(74,222,128,0.3)", justifyContent: "center", alignItems: "center" }}>
                                     <ArrowLeft size={22} color="#4ade80" />
                                 </Pressable>
                             )}

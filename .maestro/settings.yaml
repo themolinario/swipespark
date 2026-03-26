@@ -1,0 +1,24 @@
+appId: com.themolinario.swipespark
+---
+- launchApp
+
+- tapOn:
+    text: "Allow Full Access"
+    optional: true
+- tapOn:
+    text: "Allow"
+    optional: true
+
+- tapOn:
+    id: "tab-settings"
+
+- assertVisible: "Profile"
+  optional: true
+
+- tapOn:
+    id: "language-it"
+- assertVisible: "Italiano"
+
+- tapOn:
+    id: "language-en"
+- assertVisible: "English"

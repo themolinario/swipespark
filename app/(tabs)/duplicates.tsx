@@ -409,7 +409,7 @@ export function DuplicatesContent({ onBack }: { onBack?: () => void }) {
             <View style={styles.header}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
                     {onBack && (
-                        <Pressable onPress={onBack} style={styles.actionIcon}>
+                        <Pressable testID="duplicates-back-button" onPress={onBack} style={styles.actionIcon}>
                             <ArrowLeft size={22} color="#4ade80" />
                         </Pressable>
                     )}

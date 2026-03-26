@@ -1,5 +1,5 @@
 import WelcomeScreen from "@/app/welcome";
-import { fireEvent, render } from "@testing-library/react-native";
+import { fireEvent, render, waitFor } from "@testing-library/react-native";
 import { router } from "expo-router";
 import React from "react";
 
@@ -23,19 +23,19 @@ describe("Welcome Screen", () => {
     it("renders correctly", () => {
         const { getByText } = render(<WelcomeScreen />);
 
-        expect(getByText(/WELCOME TO THE/i)).toBeTruthy();
-        expect(getByText(/FUTURE OF PHOTO CLEANING/i)).toBeTruthy();
-        expect(
-            getByText("Optimized Swipe for clearing memory, automated duplicate removal, and AI-powered image analysis.")
-        ).toBeTruthy();
+        expect(getByText("welcome.title", { exact: false })).toBeTruthy();
+        expect(getByText("welcome.titleHighlight")).toBeTruthy();
+        expect(getByText("welcome.subtitle")).toBeTruthy();
     });
 
-    it("navigates to tabs on start button press", () => {
+    it("navigates to tabs on start button press", async () => {
         const { getByText } = render(<WelcomeScreen />);
 
-        const startButton = getByText("START CLEANING");
+        const startButton = getByText("welcome.startButton");
         fireEvent.press(startButton);
 
-        expect(router.replace).toHaveBeenCalledWith("/(tabs)");
+        await waitFor(() => {
+            expect(router.replace).toHaveBeenCalledWith("/(tabs)");
+        });
     });
 });
