@@ -1,4 +1,5 @@
 import "@/i18n";
+import { AchievementProvider } from "@/components/achievement-provider";
 import { GradientBackground } from "@/components/ui/gradient-background";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import {
@@ -37,6 +38,7 @@ export default function RootLayout() {
             <Stack.Screen name="welcome" />
             <Stack.Screen name="(tabs)" />
           </Stack>
+          <AchievementProvider />
           <StatusBar style="auto" />
         </GradientBackground>
       </ThemeProvider>

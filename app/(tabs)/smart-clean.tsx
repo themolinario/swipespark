@@ -429,6 +429,10 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
         scanIdRef.current += 1;
         const photosToDelete = matchedPhotos.filter(p => selectedForDeletion.has(p.id));
         photosToDelete.forEach(p => addDeletionPhoto(p as unknown as PhotoAsset));
+        if (categoryRef.current && categoryRef.current !== "Custom") {
+            const { useAchievementStore } = require("@/stores/achievement-store");
+            useAchievementStore.getState().recordSmartCleanCategory(categoryRef.current);
+        }
         setStep("SELECT_CATEGORY");
         setMatchedPhotos([]);
         setSelectedForDeletion(new Set());

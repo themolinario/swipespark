@@ -13,7 +13,7 @@ import { useStatsStore } from "@/stores/stats-store";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
 import { Trash2, Undo2 } from "lucide-react-native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dimensions, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +27,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
 
   const [swiperContainerHeight, setSwiperContainerHeight] = useState(DEFAULT_CARD_HEIGHT);
+  const allReviewedRef = useRef(false);
 
   const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number; freedBytes: number }>({
     visible: false,
@@ -124,6 +125,16 @@ export default function HomeScreen() {
     undoLastDeletion();
   }, [undoLastDeletion, deletionPhotos, removeDeletionPhoto]);
 
+  const isComplete = hasPermission && photos.length > 0 && currentIndex >= photos.length && !isLoading;
+
+  useEffect(() => {
+    if (isComplete && !allReviewedRef.current) {
+      allReviewedRef.current = true;
+      const { useAchievementStore } = require("@/stores/achievement-store");
+      useAchievementStore.getState().recordAllReviewed();
+    }
+  }, [isComplete]);
+
   if (!hasPermission) {
     return (
       <PermissionRequest
@@ -136,8 +147,6 @@ export default function HomeScreen() {
   if (photos.length === 0 && !isLoading) {
     return <EmptyState />;
   }
-
-  const isComplete = currentIndex >= photos.length && !isLoading;
 
   return (
     <FuturisticHomeBackground

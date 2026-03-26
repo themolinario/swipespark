@@ -1,5 +1,5 @@
 import { FuturisticTabBar } from "@/components/ui/futuristic-tab-bar";
-import { Images, Heart, Trash2, Wrench, Settings } from "lucide-react-native";
+import { Images, Heart, Trash2, Wrench, User } from "lucide-react-native";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 
@@ -52,9 +52,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: t("tabs.settings"),
+          title: t("tabs.profile"),
           tabBarIcon: ({ color, size }) => (
-            <Settings size={size} color={color} />
+            <User size={size} color={color} />
           ),
         }}
       />

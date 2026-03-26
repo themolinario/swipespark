@@ -56,6 +56,8 @@ export function useDuplicates() {
                 usePhotoStore.getState().removePhotosPermanently(photoIds);
                 usePhotoStore.getState().bumpDeletionVersion();
                 useStatsStore.getState().recordDeletion(photoIds.length, freedBytes);
+                const { useAchievementStore } = require("@/stores/achievement-store");
+                useAchievementStore.getState().recordDuplicatesRemoved(photoIds.length);
             }
             return { success, freedBytes };
         } catch (error) {

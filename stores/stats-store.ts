@@ -10,15 +10,17 @@ interface StatsStore {
 
 export const useStatsStore = create<StatsStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       totalPhotosDeleted: 0,
       totalBytesFreed: 0,
 
-      recordDeletion: (count, bytes) =>
-        set((state) => ({
-          totalPhotosDeleted: state.totalPhotosDeleted + count,
-          totalBytesFreed: state.totalBytesFreed + bytes,
-        })),
+      recordDeletion: (count, bytes) => {
+        const newTotal = get().totalPhotosDeleted + count;
+        const newBytes = get().totalBytesFreed + bytes;
+        set({ totalPhotosDeleted: newTotal, totalBytesFreed: newBytes });
+        const { useAchievementStore } = require("@/stores/achievement-store");
+        useAchievementStore.getState().checkDeletionAchievements(newTotal, newBytes);
+      },
     }),
     {
       name: "stats-storage",

@@ -1,10 +1,25 @@
 import { ThemedText } from "@/components/themed-text";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { getDiskInfo } from "@/modules/disk-info";
+import { ACHIEVEMENTS, useAchievementStore, type AchievementDef } from "@/stores/achievement-store";
 import { useStatsStore } from "@/stores/stats-store";
 import { setLanguage } from "@/i18n";
-import { Settings, Globe, HardDrive, ImageMinus, Trash2, Check } from "lucide-react-native";
-import { useState } from "react";
+import {
+    Check,
+    CheckCircle,
+    Copy,
+    Crown,
+    Flame,
+    Globe,
+    HardDrive,
+    ImageMinus,
+    Lock,
+    Sparkles,
+    Trash2,
+    Trophy,
+    User,
+} from "lucide-react-native";
+import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -14,6 +29,16 @@ const LANGUAGES = [
     { code: "it", labelKey: "settings.languageIt" },
 ] as const;
 
+const ICON_MAP: Record<string, React.FC<{ size: number; color: string }>> = {
+    Trash2,
+    Flame,
+    HardDrive,
+    Copy,
+    CheckCircle,
+    Sparkles,
+    Crown,
+};
+
 function formatSize(bytes: number): string {
     if (bytes >= 1024 * 1024 * 1024) {
         return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
@@ -21,16 +46,57 @@ function formatSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const AchievementCard = memo(function AchievementCard({ def, isUnlocked }: { def: AchievementDef; isUnlocked: boolean }) {
+    const { t } = useTranslation();
+    const IconComponent = ICON_MAP[def.icon] ?? Sparkles;
+    const color = isUnlocked ? def.color : "rgba(255,255,255,0.2)";
+    const tierLabel = def.tier ? t(`achievements.tier.${def.tier}`) : null;
+
+    return (
+        <View style={[styles.achievementCard, isUnlocked && { borderColor: `${def.color}33` }]}>
+            <View style={[styles.achievementIcon, { backgroundColor: isUnlocked ? `${def.color}18` : "rgba(255,255,255,0.04)" }]}>
+                {isUnlocked ? (
+                    <IconComponent size={22} color={color} />
+                ) : (
+                    <Lock size={18} color="rgba(255,255,255,0.15)" />
+                )}
+            </View>
+            <ThemedText
+                style={[styles.achievementTitle, !isUnlocked && styles.achievementTitleLocked]}
+                numberOfLines={1}
+            >
+                {t(`achievements.${def.id}.title`)}
+            </ThemedText>
+            <ThemedText
+                style={[styles.achievementDesc, !isUnlocked && styles.achievementDescLocked]}
+                numberOfLines={2}
+            >
+                {t(`achievements.${def.id}.desc`)}
+            </ThemedText>
+            {tierLabel && (
+                <View style={[styles.achievementTier, { borderColor: isUnlocked ? def.color : "rgba(255,255,255,0.1)" }]}>
+                    <ThemedText style={[styles.achievementTierText, { color: isUnlocked ? def.color : "rgba(255,255,255,0.2)" }]}>
+                        {tierLabel}
+                    </ThemedText>
+                </View>
+            )}
+        </View>
+    );
+});
+
 export default function SettingsScreen() {
     const { t, i18n } = useTranslation();
     const insets = useSafeAreaInsets();
     const { totalPhotosDeleted, totalBytesFreed } = useStatsStore();
+    const unlocked = useAchievementStore((s) => s.unlocked);
     const [currentLang, setCurrentLang] = useState(i18n.language);
 
     const { total: totalDisk, available: availableDisk } = getDiskInfo();
     const usedDisk = totalDisk - availableDisk;
     const usedPercentage = totalDisk > 0 ? (usedDisk / totalDisk) * 100 : 0;
     const barColor = usedPercentage >= 90 ? "#ff4444" : usedPercentage >= 80 ? "#ffaa00" : "#4ade80";
+
+    const unlockedCount = Object.keys(unlocked).filter((k) => unlocked[k as keyof typeof unlocked]).length;
 
     const handleLanguageChange = async (code: string) => {
         setCurrentLang(code);
@@ -43,7 +109,7 @@ export default function SettingsScreen() {
                 <View style={styles.header}>
                     <View style={styles.headerRow}>
                         <View style={styles.headerIconGlow}>
-                            <Settings size={24} color="#4ade80" />
+                            <User size={24} color="#4ade80" />
                         </View>
                         <ThemedText style={styles.title}>{t("settings.title")}</ThemedText>
                     </View>
@@ -119,6 +185,37 @@ export default function SettingsScreen() {
                                 {t("settings.totalFreed")}
                             </ThemedText>
                         </View>
+                    </View>
+                </View>
+
+                <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                        <Trophy size={16} color="#ffd700" />
+                        <ThemedText style={[styles.sectionTitle, { color: "rgba(255,215,0,0.7)" }]}>
+                            {t("settings.achievements")}
+                        </ThemedText>
+                        <ThemedText style={styles.achievementCount}>
+                            {t("settings.achievementsProgress", { unlocked: unlockedCount, total: ACHIEVEMENTS.length })}
+                        </ThemedText>
+                    </View>
+
+                    <View style={styles.achievementProgressBar}>
+                        <View
+                            style={[
+                                styles.achievementProgressFill,
+                                { width: `${(unlockedCount / ACHIEVEMENTS.length) * 100}%` },
+                            ]}
+                        />
+                    </View>
+
+                    <View style={styles.achievementsGrid}>
+                        {ACHIEVEMENTS.map((def) => (
+                            <AchievementCard
+                                key={def.id}
+                                def={def}
+                                isUnlocked={!!unlocked[def.id]}
+                            />
+                        ))}
                     </View>
                 </View>
             </ScrollView>
@@ -275,5 +372,79 @@ const styles = StyleSheet.create({
         width: 1,
         height: 50,
         backgroundColor: "rgba(255,255,255,0.1)",
+    },
+    achievementCount: {
+        fontSize: 12,
+        fontWeight: "600",
+        color: "rgba(255,215,0,0.5)",
+        marginLeft: "auto",
+    },
+    achievementProgressBar: {
+        height: 4,
+        borderRadius: 2,
+        backgroundColor: "rgba(255,255,255,0.08)",
+        overflow: "hidden",
+        marginBottom: 16,
+    },
+    achievementProgressFill: {
+        height: "100%",
+        borderRadius: 2,
+        backgroundColor: "#ffd700",
+    },
+    achievementsGrid: {
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 10,
+    },
+    achievementCard: {
+        width: "48%",
+        flexGrow: 1,
+        backgroundColor: "rgba(255,255,255,0.04)",
+        borderRadius: 14,
+        borderCurve: "continuous",
+        borderWidth: 1,
+        borderColor: "rgba(255,255,255,0.06)",
+        padding: 14,
+        gap: 6,
+    },
+    achievementIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        borderCurve: "continuous",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 2,
+    },
+    achievementTitle: {
+        fontSize: 14,
+        fontWeight: "700",
+        color: "#fff",
+    },
+    achievementTitleLocked: {
+        color: "rgba(255,255,255,0.3)",
+    },
+    achievementDesc: {
+        fontSize: 11,
+        lineHeight: 15,
+        color: "rgba(255,255,255,0.5)",
+    },
+    achievementDescLocked: {
+        color: "rgba(255,255,255,0.2)",
+    },
+    achievementTier: {
+        alignSelf: "flex-start",
+        borderWidth: 1,
+        borderRadius: 6,
+        borderCurve: "continuous",
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        marginTop: 2,
+    },
+    achievementTierText: {
+        fontSize: 9,
+        fontWeight: "700",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
     },
 });
