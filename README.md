@@ -46,7 +46,8 @@ Works entirely on-device using your local media library. No cloud uploads, no tr
 | UI Effects | expo-blur, expo-glass-effect, expo-linear-gradient |
 | Haptics | expo-haptics |
 | Icons | lucide-react-native |
-| Testing | Jest + React Native Testing Library |
+| Unit Testing | Jest 29 + React Native Testing Library |
+| E2E Testing | Maestro |
 
 ---
 
@@ -99,6 +100,8 @@ swipespark/
 ├── stores/                     # Zustand stores (persisted via AsyncStorage)
 │   ├── photo-store.ts          # Keep / delete decisions
 │   ├── duplicate-store.ts      # Duplicate groups, scan state, hashes
+│   ├── stats-store.ts          # Deletion statistics
+│   ├── achievement-store.ts    # Achievement system and unlock logic
 │   └── classification-cache.ts # ML label cache (30-day TTL)
 │
 ├── hooks/                      # Custom React hooks
@@ -113,7 +116,9 @@ swipespark/
 │   └── category-mapper.ts      # ML label → category mapping with scoring
 │
 ├── constants/                  # Theme and app constants
-├── test/                       # Jest test suites
+├── i18n/                       # Internationalization (en, it)
+├── test/                       # Jest unit and integration tests
+├── .maestro/                   # Maestro E2E test flows
 └── assets/                     # Images, icons, splash screens
 ```
 

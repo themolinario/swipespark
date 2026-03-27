@@ -9,7 +9,7 @@ class DiskInfoModule : Module() {
     Name("DiskInfo")
 
     Function("getDiskInfo") {
-      val stat = StatFs(context.filesDir.path)
+      val stat = StatFs(appContext.reactContext!!.filesDir.path)
       mapOf(
         "total" to stat.totalBytes,
         "available" to stat.availableBytes
