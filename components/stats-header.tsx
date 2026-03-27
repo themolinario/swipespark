@@ -1,6 +1,5 @@
 import { memo } from "react";
 import { StyleSheet, View } from "react-native";
-import { useTranslation } from "react-i18next";
 import { ThemedText } from "./themed-text";
 
 interface StatsHeaderProps {
@@ -13,10 +12,8 @@ interface StatsHeaderProps {
 export const StatsHeader = memo(function StatsHeader({
   currentIndex,
   totalCount,
-  deletedCount,
   actionButton,
 }: StatsHeaderProps) {
-  const { t } = useTranslation();
   const displayedIndex = totalCount > 0 ? Math.min(currentIndex + 1, totalCount) : 0;
   const progress = totalCount > 0 ? (displayedIndex / totalCount) * 100 : 0;
 
@@ -32,12 +29,6 @@ export const StatsHeader = memo(function StatsHeader({
             {actionButton}
           </View>
         )}
-        <View style={styles.statItem}>
-          <ThemedText style={[styles.statValue, styles.deleteValue]}>
-            {deletedCount}
-          </ThemedText>
-          <ThemedText style={styles.statLabel}>{t("stats.toDelete")}</ThemedText>
-        </View>
       </View>
 
       <View style={styles.progressContainer}>
@@ -71,12 +62,6 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(255, 255, 255, 0.4)",
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 8,
-  },
-  deleteValue: {
-    color: "#ff3b30",
-    textShadowColor: "rgba(255, 59, 48, 0.5)",
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
   },
   statLabel: {
     fontSize: 14,

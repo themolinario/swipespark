@@ -13,6 +13,8 @@
 
   "home.deleteCount": "Delete {{count}}",
   "home.undo": "Undo",
+  "home.swipe.trash": "TRASH",
+  "home.swipe.keep": "KEEP",
 
   "stats.toDelete": "to delete",
 

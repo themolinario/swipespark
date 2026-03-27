@@ -2,7 +2,7 @@
   "expo": {
     "name": "SwipeSpark",
     "slug": "swipespark",
-    "version": "1.1.9",
+    "version": "1.1.13",
     "orientation": "portrait",
     "icon": "./assets/images/1024.png",
     "scheme": "swipespark",
@@ -42,7 +42,7 @@
         "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.themolinario.swipespark",
-      "versionCode": 2
+      "versionCode": 4
     },
     "web": {
       "output": "static",

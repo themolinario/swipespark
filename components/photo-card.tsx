@@ -9,6 +9,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { PhotoAsset } from "@/services/media-library.service";
+import { useTranslation } from "react-i18next";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
@@ -29,6 +30,7 @@ export const PhotoCard = memo(function PhotoCard({
   isActive,
   cardHeight,
 }: PhotoCardProps) {
+  const { t } = useTranslation();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -98,14 +100,14 @@ export const PhotoCard = memo(function PhotoCard({
           style={[styles.indicator, styles.deleteIndicator, leftIndicatorStyle]}
         >
           <View style={[styles.indicatorContent, styles.deleteIndicatorContent]}>
-            <Animated.Text style={[styles.indicatorText, styles.deleteIndicatorText]}>TRASH</Animated.Text>
+            <Animated.Text style={[styles.indicatorText, styles.deleteIndicatorText]}>{t("home.swipe.trash")}</Animated.Text>
           </View>
         </Animated.View>
         <Animated.View
           style={[styles.indicator, styles.keepIndicator, rightIndicatorStyle]}
         >
           <View style={[styles.indicatorContent, styles.keepIndicatorContent]}>
-            <Animated.Text style={[styles.indicatorText, styles.keepIndicatorText]}>KEEP</Animated.Text>
+            <Animated.Text style={[styles.indicatorText, styles.keepIndicatorText]}>{t("home.swipe.keep")}</Animated.Text>
           </View>
         </Animated.View>
       </Animated.View>
