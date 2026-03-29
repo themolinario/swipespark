@@ -1,3 +1,4 @@
+import * as MediaLibrary from "expo-media-library";
 import { PhotoAsset, mediaLibraryService } from "@/services/media-library.service";
 import { DuplicateGroup, findDuplicatesByHash } from "@/utils/duplicate-detection";
 import { DuplicateDetectorModule } from "@/modules/duplicate-detector";
@@ -66,13 +67,21 @@ export const useDuplicateStore = create<DuplicateStore>()(
                     let totalCount = 1;
                     let allAvailableAssets: PhotoAsset[] = [];
 
+                    // RALPH FIX [BUG2]: After video support was added to mediaLibraryService.fetchPhotos,
+                    // it began fetching both photos AND videos. The duplicate scan background task
+                    // (started at app launch) then had to paginate through all videos too, taking 3x
+                    // longer (reaching ~30 seconds on large libraries). At that point, the native
+                    // computeHashes call ran 20 concurrent full-resolution image reads (Semaphore(20)),
+                    // spiking memory usage by ~100-300MB and causing an OOM crash. Fix: fetch
+                    // photos-only here (videos are irrelevant for duplicate detection) and use push()
+                    // instead of spread-into-new-array to avoid O(n²) memory churn.
                     while (hasNext) {
-                        const result = await mediaLibraryService.fetchPhotos(500, cursor);
+                        const result = await mediaLibraryService.fetchPhotos(500, cursor, [MediaLibrary.MediaType.photo]);
                         const filteredAssets = result.assets.filter(
                             (p) => !usePhotoStore.getState().isPhotoMarkedForDeletion(p.id)
                         );
 
-                        allAvailableAssets = [...allAvailableAssets, ...filteredAssets];
+                        allAvailableAssets.push(...filteredAssets);
                         cursor = result.endCursor;
                         hasNext = result.hasNextPage;
                         totalCount = result.totalCount || 1;

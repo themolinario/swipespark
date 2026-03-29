@@ -8,6 +8,7 @@ import { AppState, AppStateStatus } from "react-native";
 
 const PAGE_SIZE = 20;
 const PRELOAD_THRESHOLD = 5;
+const KEEP_BEHIND = 3;
 
 interface UsePhotosState {
   photos: PhotoAsset[];
@@ -54,14 +55,15 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
       let currentTotalCount = 0;
       let hasNext = true;
 
+      const storeState = usePhotoStore.getState();
+      const keptIds = new Set(storeState.keptPhotos.map((p) => p.id));
+      const deletionIds = new Set(storeState.deletionPhotos.map((p) => p.id));
+
       while (newAssets.length < PRELOAD_THRESHOLD && hasNext) {
         const result = await mediaLibraryService.fetchPhotos(PAGE_SIZE, cursor);
-        const state = usePhotoStore.getState();
 
         const validPhotos = result.assets.filter(
-          (photo) =>
-            !state.isPhotoKept(photo.id) &&
-            !state.isPhotoMarkedForDeletion(photo.id),
+          (photo) => !keptIds.has(photo.id) && !deletionIds.has(photo.id),
         );
 
         newAssets = [...newAssets, ...validPhotos];
@@ -212,8 +214,14 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
   }, [currentIndex, photos.length, fetchPhotos]);
 
   const moveToNext = useCallback(() => {
-    setCurrentIndex((prev) => Math.min(prev + 1, photos.length));
-  }, [photos.length]);
+    if (currentIndex > KEEP_BEHIND) {
+      const trimCount = currentIndex - KEEP_BEHIND;
+      setPhotos((prev) => prev.slice(trimCount));
+      setCurrentIndex((prev) => Math.min(prev + 1, photos.length) - trimCount);
+    } else {
+      setCurrentIndex((prev) => Math.min(prev + 1, photos.length));
+    }
+  }, [currentIndex, photos.length]);
 
   const markForDeletion = useCallback(
     (id: string) => {
@@ -232,7 +240,8 @@ export function usePhotos(): UsePhotosState & UsePhotosActions {
 
     const success = await mediaLibraryService.deleteAssets(ids);
     if (success) {
-      setPhotos((prev) => prev.filter((photo) => !ids.includes(photo.id)));
+      const idsSet = new Set(ids);
+      setPhotos((prev) => prev.filter((photo) => !idsSet.has(photo.id)));
       setCurrentIndex(0);
       endCursorRef.current = undefined;
       hasNextPageRef.current = true;

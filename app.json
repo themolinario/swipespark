@@ -2,7 +2,7 @@
   "expo": {
     "name": "SwipeSpark",
     "slug": "swipespark",
-    "version": "1.1.13",
+    "version": "1.1.18",
     "orientation": "portrait",
     "icon": "./assets/images/1024.png",
     "scheme": "swipespark",
@@ -42,7 +42,7 @@
         "android.permission.READ_MEDIA_AUDIO"
       ],
       "package": "com.themolinario.swipespark",
-      "versionCode": 4
+      "versionCode": 9
     },
     "web": {
       "output": "static",
@@ -66,7 +66,8 @@
           "isAccessMediaLocationEnabled": true
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      ["expo-video", { "supportsBackgroundPlayback": false, "supportsPictureInPicture": false }]
     ],
     "experiments": {
       "typedRoutes": true,

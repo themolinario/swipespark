@@ -1,5 +1,5 @@
-import { memo, useCallback } from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
+import { memo, useCallback, useMemo } from "react";
+import { Dimensions, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import Animated, {
   runOnJS,
@@ -10,10 +10,17 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { PhotoAsset } from "@/services/media-library.service";
 import { useTranslation } from "react-i18next";
+import { Play } from "lucide-react-native";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.25;
 const CARD_WIDTH = SCREEN_WIDTH * 0.88;
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 
 interface PhotoCardProps {
   photo: PhotoAsset;
@@ -21,6 +28,7 @@ interface PhotoCardProps {
   onSwipeRight: () => void;
   isActive: boolean;
   cardHeight: number;
+  onPress?: () => void;
 }
 
 export const PhotoCard = memo(function PhotoCard({
@@ -29,6 +37,7 @@ export const PhotoCard = memo(function PhotoCard({
   onSwipeRight,
   isActive,
   cardHeight,
+  onPress,
 }: PhotoCardProps) {
   const { t } = useTranslation();
   const translateX = useSharedValue(0);
@@ -47,27 +56,38 @@ export const PhotoCard = memo(function PhotoCard({
     [onSwipeLeft, onSwipeRight],
   );
 
-  const panGesture = Gesture.Pan()
-    .enabled(isActive)
-    .onUpdate((event) => {
-      translateX.value = event.translationX;
-      translateY.value = event.translationY * 0.5;
-      rotation.value = (event.translationX / SCREEN_WIDTH) * 20;
-    })
-    .onEnd((event) => {
-      if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
-        const direction = event.translationX > 0 ? "right" : "left";
-        const targetX =
-          direction === "right" ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
-
-        translateX.value = withSpring(targetX, { damping: 20 });
-        runOnJS(handleSwipeComplete)(direction);
-      } else {
-        translateX.value = withSpring(0, { damping: 15 });
-        translateY.value = withSpring(0, { damping: 15 });
-        rotation.value = withSpring(0, { damping: 15 });
-      }
-    });
+  const composed = useMemo(
+    () =>
+      Gesture.Exclusive(
+        Gesture.Pan()
+          .enabled(isActive)
+          .onUpdate((event) => {
+            translateX.value = event.translationX;
+            translateY.value = event.translationY * 0.5;
+            rotation.value = (event.translationX / SCREEN_WIDTH) * 20;
+          })
+          .onEnd((event) => {
+            if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
+              const direction = event.translationX > 0 ? "right" : "left";
+              const targetX =
+                direction === "right" ? SCREEN_WIDTH * 1.5 : -SCREEN_WIDTH * 1.5;
+              translateX.value = withSpring(targetX, { damping: 20 });
+              runOnJS(handleSwipeComplete)(direction);
+            } else {
+              translateX.value = withSpring(0, { damping: 15 });
+              translateY.value = withSpring(0, { damping: 15 });
+              rotation.value = withSpring(0, { damping: 15 });
+            }
+          }),
+        Gesture.Tap()
+          .enabled(isActive && !!onPress)
+          .maxDuration(250)
+          .onEnd(() => {
+            if (onPress) runOnJS(onPress)();
+          }),
+      ),
+    [isActive, onPress, handleSwipeComplete, translateX, translateY, rotation],
+  );
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
@@ -87,15 +107,25 @@ export const PhotoCard = memo(function PhotoCard({
   }));
 
   return (
-    <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={composed}>
       <Animated.View style={[styles.card, { height: cardHeight }, animatedStyle]}>
-        <Image
-          source={{ uri: photo.uri }}
-          style={styles.image}
-          contentFit="cover"
-          transition={200}
-          recyclingKey={photo.id}
-        />
+        {photo.mediaType === "video" ? (
+          <View style={styles.videoPlaceholder}>
+            <Play size={48} color="rgba(255,255,255,0.9)" fill="rgba(255,255,255,0.9)" />
+            <View style={styles.videoBadge}>
+              <Play size={10} color="#fff" fill="#fff" />
+              <Text style={styles.videoBadgeText}>{formatDuration(photo.duration)}</Text>
+            </View>
+          </View>
+        ) : (
+          <Image
+            source={{ uri: photo.uri }}
+            style={styles.image}
+            contentFit="cover"
+            transition={200}
+            recyclingKey={photo.id}
+          />
+        )}
         <Animated.View
           style={[styles.indicator, styles.deleteIndicator, leftIndicatorStyle]}
         >
@@ -129,6 +159,31 @@ const styles = StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
+  },
+  videoPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#0a0a0a",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  videoBadge: {
+    position: "absolute",
+    bottom: 8,
+    left: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderCurve: 'continuous',
+  },
+  videoBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "600",
   },
   indicator: {
     position: "absolute",

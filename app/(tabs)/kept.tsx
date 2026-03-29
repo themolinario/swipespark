@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { PhotoAsset } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
-import { Check, Undo2, Heart } from "lucide-react-native";
+import { Check, Undo2, Heart, Play } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
 import React, { useCallback, useRef, useState } from "react";
@@ -15,12 +15,19 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 const COLUMN_COUNT = 3;
 const GAP = 3;
 const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
@@ -231,6 +238,12 @@ export default function KeptPhotosScreen() {
               contentFit="cover"
               transition={200}
             />
+            {item.mediaType === "video" && (
+              <View style={styles.videoBadge}>
+                <Play size={10} color="#fff" fill="#fff" />
+                <Text style={styles.videoBadgeText}>{formatDuration(item.duration)}</Text>
+              </View>
+            )}
           </View>
           {isSelectMode ? (
             <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
@@ -272,10 +285,15 @@ export default function KeptPhotosScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <ThemedText style={styles.title}>
             {isSelectMode
-              ? t("keptScreen.selectedCount", { count: selectedIds.size })
+              ? t(
+                  keptPhotos.some(p => selectedIds.has(p.id) && p.mediaType === "video")
+                    ? "keptScreen.selectedCountMixed"
+                    : "keptScreen.selectedCount",
+                  { count: selectedIds.size }
+                )
               : t("keptScreen.title")}
           </ThemedText>
           {!isSelectMode && (
@@ -443,6 +461,24 @@ const styles = StyleSheet.create({
   photoSelected: {
     opacity: 0.75,
   },
+  videoBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderCurve: 'continuous',
+  },
+  videoBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
   removeIconContainer: {
     position: "absolute",
     top: 6,
@@ -478,10 +514,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOpacity: 0.6,
   },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
   headerButtons: {
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
+    flexShrink: 0,
   },
   selectButton: {
     paddingHorizontal: 14,

@@ -11,6 +11,7 @@ interface PhotoSwiperProps {
   onSwipeLeft: (id: string) => void;
   onSwipeRight: () => void;
   cardHeight: number;
+  onPress?: (photo: PhotoAsset) => void;
 }
 
 export const PhotoSwiper = memo(function PhotoSwiper({
@@ -19,6 +20,7 @@ export const PhotoSwiper = memo(function PhotoSwiper({
   onSwipeLeft,
   onSwipeRight,
   cardHeight,
+  onPress,
 }: PhotoSwiperProps) {
   const visiblePhotos = useMemo(() => {
     return photos.slice(currentIndex, currentIndex + VISIBLE_CARDS).reverse();
@@ -53,6 +55,7 @@ export const PhotoSwiper = memo(function PhotoSwiper({
               onSwipeRight={onSwipeRight}
               isActive={isActive}
               cardHeight={cardHeight}
+              onPress={onPress ? () => onPress(photo) : undefined}
             />
           </View>
         );

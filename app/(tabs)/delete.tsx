@@ -11,7 +11,7 @@ import {
 import { usePhotoStore } from "@/stores/photo-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useStatsStore } from "@/stores/stats-store";
-import { Check, Undo2, Trash2 } from "lucide-react-native";
+import { Check, Undo2, Trash2, Play } from "lucide-react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { Image } from "expo-image";
 import React, { useCallback, useRef, useState } from "react";
@@ -23,12 +23,19 @@ import {
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   View
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+function formatDuration(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
 const COLUMN_COUNT = 3;
 const GAP = 3;
 const ITEM_SIZE = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
@@ -307,6 +314,12 @@ export default function DeletePhotosScreen() {
               contentFit="cover"
               transition={200}
             />
+            {item.mediaType === "video" && (
+              <View style={styles.videoBadge}>
+                <Play size={10} color="#fff" fill="#fff" />
+                <Text style={styles.videoBadgeText}>{formatDuration(item.duration)}</Text>
+              </View>
+            )}
           </View>
           {isSelectMode ? (
             <View style={[styles.checkCircle, isSelected && styles.checkCircleSelected]}>
@@ -348,10 +361,15 @@ export default function DeletePhotosScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerLeft}>
           <ThemedText style={styles.title}>
             {isSelectMode
-              ? t("deleteScreen.selectedCount", { count: selectedIds.size })
+              ? t(
+                  deletionPhotos.some(p => selectedIds.has(p.id) && p.mediaType === "video")
+                    ? "deleteScreen.selectedCountMixed"
+                    : "deleteScreen.selectedCount",
+                  { count: selectedIds.size }
+                )
               : t("deleteScreen.title")}
           </ThemedText>
           {!isSelectMode && (
@@ -570,6 +588,24 @@ const styles = StyleSheet.create({
   photoSelected: {
     opacity: 1,
   },
+  videoBadge: {
+    position: "absolute",
+    bottom: 6,
+    left: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderCurve: 'continuous',
+  },
+  videoBadgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "600",
+  },
   restoreIconContainer: {
     position: "absolute",
     top: 6,
@@ -638,10 +674,15 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOpacity: 0.6,
   },
+  headerLeft: {
+    flex: 1,
+    minWidth: 0,
+  },
   headerButtons: {
     flexDirection: "row",
     gap: 8,
     alignItems: "center",
+    flexShrink: 0,
   },
   selectButton: {
     paddingHorizontal: 14,

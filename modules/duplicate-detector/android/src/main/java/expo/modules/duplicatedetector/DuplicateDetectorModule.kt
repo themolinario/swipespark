@@ -34,7 +34,10 @@ class DuplicateDetectorModule : Module() {
         try {
           val results = java.util.concurrent.ConcurrentHashMap<String, String>(total)
           val completed = java.util.concurrent.atomic.AtomicInteger(0)
-          val semaphore = Semaphore(20)
+          // RALPH FIX [BUG2]: Semaphore was 20, allowing 20 full-resolution images (~5-15 MB each)
+          // to be read concurrently for SHA-256 hashing. This caused 100-300 MB memory spikes
+          // triggering OOM crashes on memory-constrained Android devices.
+          val semaphore = Semaphore(4)
 
           val jobs = assetIds.map { assetId ->
             async {

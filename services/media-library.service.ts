@@ -46,6 +46,7 @@ class MediaLibraryService {
   async fetchPhotos(
     pageSize: number = 20,
     after?: string,
+    mediaType: MediaLibrary.MediaTypeValue[] = [MediaLibrary.MediaType.photo, MediaLibrary.MediaType.video],
   ): Promise<FetchPhotosResult> {
     let { status } = await MediaLibrary.getPermissionsAsync();
 
@@ -62,7 +63,7 @@ class MediaLibraryService {
     const result = await MediaLibrary.getAssetsAsync({
       first: pageSize,
       after,
-      mediaType: [MediaLibrary.MediaType.photo],
+      mediaType,
       sortBy: [MediaLibrary.SortBy.creationTime],
     });
 

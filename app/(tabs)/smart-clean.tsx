@@ -267,7 +267,13 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
         try {
             const { status } = await MediaLibrary.requestPermissionsAsync();
             if (scanId !== scanIdRef.current) return;
-            if (status !== "granted") {
+            // RALPH FIX [BUG1]: On Android 14+ with READ_MEDIA_VISUAL_USER_SELECTED declared, limited
+            // photo access returns status "limited" (not in the PermissionStatus enum but valid at
+            // runtime). On iOS 14+ limited access also returns "limited". The previous strict
+            // status !== "granted" check caused Smart Clean to silently abort for any user who had
+            // granted limited access, making the feature appear completely broken on Android/iOS 14+.
+            if (status !== "granted" && (status as string) !== "limited") {
+                console.error("[SmartClean] Permission denied or undetermined:", status);
                 setStep("SELECT_CATEGORY");
                 return;
             }

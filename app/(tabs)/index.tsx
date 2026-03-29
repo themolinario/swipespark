@@ -2,11 +2,13 @@ import { ActionButtons } from "@/components/action-buttons";
 import { DeletionSuccessModal } from "@/components/deletion-success-modal";
 import { EmptyState } from "@/components/empty-state";
 import { PermissionRequest } from "@/components/permission-request";
+import { PhotoPreviewModal } from "@/components/photo-preview-modal";
 import { PhotoSwiper } from "@/components/photo-swiper";
 import { StatsHeader } from "@/components/stats-header";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { usePhotos } from "@/hooks/use-photos";
 import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
+import { PhotoAsset } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useStatsStore } from "@/stores/stats-store";
@@ -28,6 +30,7 @@ export default function HomeScreen() {
 
   const [swiperContainerHeight, setSwiperContainerHeight] = useState(DEFAULT_CARD_HEIGHT);
   const allReviewedRef = useRef(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const [successModal, setSuccessModal] = useState<{ visible: boolean; count: number; freedBytes: number }>({
     visible: false,
@@ -125,6 +128,14 @@ export default function HomeScreen() {
     undoLastDeletion();
   }, [undoLastDeletion, deletionPhotos, removeDeletionPhoto]);
 
+  const handleCardPress = useCallback(
+    (photo: PhotoAsset) => {
+      const idx = photos.findIndex((p) => p.id === photo.id);
+      if (idx >= 0) setPreviewIndex(idx);
+    },
+    [photos],
+  );
+
   const isComplete = hasPermission && photos.length > 0 && currentIndex >= photos.length && !isLoading;
 
   useEffect(() => {
@@ -214,6 +225,7 @@ export default function HomeScreen() {
               onSwipeLeft={handleSwipeLeft}
               onSwipeRight={handleKeep}
               cardHeight={Math.min(swiperContainerHeight - 32, DEFAULT_CARD_HEIGHT)}
+              onPress={handleCardPress}
             />
           </View>
 
@@ -233,6 +245,14 @@ export default function HomeScreen() {
         deletedCount={successModal.count}
         freedBytes={successModal.freedBytes}
         onClose={() => setSuccessModal({ visible: false, count: 0, freedBytes: 0 })}
+      />
+
+      <PhotoPreviewModal
+        visible={previewIndex !== null}
+        photos={photos}
+        initialIndex={previewIndex ?? 0}
+        variant="view-only"
+        onClose={() => setPreviewIndex(null)}
       />
     </FuturisticHomeBackground>
   );
