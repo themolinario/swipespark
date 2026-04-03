@@ -86,6 +86,9 @@
   "smart.deletePhotos_one": "Elimina {{count}} foto",
   "smart.deletePhotos_other": "Elimina {{count}} foto",
   "smart.selectedCount": "{{count}} selezionate",
+  "smart.backgroundSearchRunning": "La ricerca è in esecuzione in background. Puoi navigare liberamente nell'app.",
+  "smart.scanCompleteToastTitle": "Scansione completata",
+  "smart.scanCompleteToastBody": "{{count}} foto trovate. Tocca per rivedere.",
 
   "duplicates.title": "Duplicati",
   "duplicates.groupsFound": "{{count}} gruppi trovati",

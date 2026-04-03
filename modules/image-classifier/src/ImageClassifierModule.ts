@@ -10,7 +10,7 @@ export interface ClassificationResult {
   labels: LabelResult[];
 }
 
-declare class ImageClassifierModule extends NativeModule {
+declare class ImageClassifierModule extends NativeModule<{}> {
   classifyImage(uri: string): Promise<string[]>;
   classifyImages(uris: string[]): Promise<ClassificationResult[]>;
   getAssetsSize(uris: string[]): Promise<number>;

@@ -318,5 +318,34 @@ class ImageClassifierModule : Module() {
         promise.reject("GET_SIZE_ERROR", e.message ?: "Unknown error", e)
       }
     }
+
+    AsyncFunction("startNativeScan") { category: String, customQuery: String, promise: Promise ->
+      // Stub for Android: background scan is not implemented natively yet.
+      promise.resolve(mapOf(
+        "notificationPermission" to "undetermined",
+        "mediaPermissionDenied" to false
+      ))
+    }
+
+    Function("stopNativeScan") {
+      // Stub
+    }
+
+    AsyncFunction("getNativeScanState") { promise: Promise ->
+      promise.resolve(mapOf(
+        "isRunning" to false,
+        "isComplete" to false,
+        "matchedIds" to emptyList<String>()
+      ))
+    }
+
+    AsyncFunction("getAssetsByLocalIds") { ids: List<String>, promise: Promise ->
+      // Stub -> return empty list
+      promise.resolve(emptyList<Map<String, Any>>())
+    }
+
+    AsyncFunction("requestNotificationPermission") { promise: Promise ->
+      promise.resolve("undetermined")
+    }
   }
 }

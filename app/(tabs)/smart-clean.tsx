@@ -2,11 +2,12 @@ import { AnimatedScanner } from "@/components/ui/animated-scanner";
 import { Button } from "@/components/ui/button";
 import { PhotoPreviewModal } from "@/components/photo-preview-modal";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
-import { classifyImages } from "@/modules/image-classifier";
-import { useClassificationCache, CachedLabel } from "@/stores/classification-cache";
+import { useClassificationCache } from "@/stores/classification-cache";
 import { usePhotoStore } from "@/stores/photo-store";
 import { PhotoAsset } from "@/services/media-library.service";
-import { mapLabelsToCategory, matchesCustomQuery, SmartCategory, LabelWithConfidence } from "@/utils/category-mapper";
+import { startScan, stopScan } from "@/services/smart-clean-scan.service";
+import { useSmartCleanStore } from "@/stores/smart-clean-store";
+import { SmartCategory } from "@/utils/category-mapper";
 import { Users, Image as ImageIcon, FileText, PawPrint, Utensils, Car, Home, Search, ArrowLeft, Check, Wand2, X, Trash2, Square } from "lucide-react-native";
 import { Image } from "expo-image";
 import * as MediaLibrary from "expo-media-library";
@@ -28,8 +29,6 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 
-type WizardStep = "SELECT_CATEGORY" | "ENTER_CUSTOM_QUERY" | "SCANNING" | "REVIEW_RESULTS";
-
 type CategoryLabelKey = "smart.categoryPeople" | "smart.categoryLandscapes" | "smart.categoryDocuments" | "smart.categoryAnimals" | "smart.categoryFood" | "smart.categoryVehicles" | "smart.categoryInteriors" | "smart.categoryCustom";
 
 const CATEGORIES: { label: SmartCategory; labelKey: CategoryLabelKey; Icon: any }[] = [
@@ -43,8 +42,6 @@ const CATEGORIES: { label: SmartCategory; labelKey: CategoryLabelKey; Icon: any 
     { label: "Custom", labelKey: "smart.categoryCustom", Icon: Search },
 ];
 
-const FETCH_PAGE_SIZE = 500;
-const NATIVE_BATCH_SIZE = 50;
 const DISPLAY_BATCH_SIZE = 15;
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -57,35 +54,21 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
     const insets = useSafeAreaInsets();
     const tabBarHeight = useBottomTabBarHeight();
 
-    const [step, setStep] = useState<WizardStep>("SELECT_CATEGORY");
-    const [selectedCategory, setSelectedCategory] = useState<SmartCategory | null>(null);
+    const isSearchRunning = useSmartCleanStore((s) => s.isSearchRunning);
+    const searchProgress = useSmartCleanStore((s) => s.searchProgress);
+    const searchStatusText = useSmartCleanStore((s) => s.searchStatusText);
+    const matchedPhotos = useSmartCleanStore((s) => s.matchedPhotos);
+    const scanComplete = useSmartCleanStore((s) => s.scanComplete);
+    const selectedCategory = useSmartCleanStore((s) => s.selectedCategory);
+    const storeCustomQuery = useSmartCleanStore((s) => s.customQuery);
+    const [showCustomQuery, setShowCustomQuery] = useState(false);
     const [customQuery, setCustomQuery] = useState("");
-
-    const [progress, setProgress] = useState(0);
-    const [scanStatusText, setScanStatusText] = useState("");
-    const [matchedPhotos, setMatchedPhotos] = useState<MediaLibrary.Asset[]>([]);
     const [selectedForDeletion, setSelectedForDeletion] = useState<Set<string>>(new Set());
-    const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [scanComplete, setScanComplete] = useState(false);
-
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
     const [isScrollingDisabled, setIsScrollingDisabled] = useState(false);
 
     const addDeletionPhoto = usePhotoStore((state) => state.addDeletionPhoto);
-    const isPhotoKept = usePhotoStore((state) => state.isPhotoKept);
-    const isPhotoMarkedForDeletion = usePhotoStore((state) => state.isPhotoMarkedForDeletion);
-
-    const getCachedLabels = useClassificationCache((s) => s.getCachedLabels);
-    const setCachedLabelsBatch = useClassificationCache((s) => s.setCachedLabelsBatch);
-
-    const scanIdRef = useRef(0);
-    const endCursorRef = useRef<string | undefined>(undefined);
-    const hasNextPageRef = useRef(true);
-    const totalProcessedRef = useRef(0);
-    const totalAssetsEstimateRef = useRef(0);
-    const categoryRef = useRef<SmartCategory | null>(null);
-    const customQueryRef = useRef("");
 
     const isDragging = useRef(false);
     const scrollOffset = useRef(0);
@@ -99,214 +82,32 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
     const currentTouchX = useRef(0);
     const listStartY = useRef(0);
 
-    const checkMatch = useCallback((category: SmartCategory, labels: LabelWithConfidence[]): boolean => {
+    // Derived step — no useState needed
+    const step = showCustomQuery
+        ? "ENTER_CUSTOM_QUERY"
+        : isSearchRunning && matchedPhotos.length === 0
+            ? "SCANNING"
+            : matchedPhotos.length > 0 || scanComplete
+                ? "REVIEW_RESULTS"
+                : "SELECT_CATEGORY";
+
+    const handleCategoryPress = useCallback(async (category: SmartCategory) => {
         if (category === "Custom") {
-            return matchesCustomQuery(labels, customQueryRef.current);
-        }
-        const result = mapLabelsToCategory(labels);
-        return result.category === category;
-    }, []);
-
-    const loadNextBatch = useCallback(async (category: SmartCategory, scanId: number) => {
-        if (!hasNextPageRef.current || scanId !== scanIdRef.current) return;
-
-        setIsLoadingMore(true);
-        let newlyFoundCount = 0;
-        const totalEstimate = totalAssetsEstimateRef.current;
-
-        try {
-            while (hasNextPageRef.current && scanId === scanIdRef.current) {
-                const page = await MediaLibrary.getAssetsAsync({
-                    first: FETCH_PAGE_SIZE,
-                    after: endCursorRef.current,
-                    mediaType: "photo",
-                    sortBy: ["modificationTime"],
-                });
-
-                if (scanId !== scanIdRef.current) break;
-
-                const validAssets = page.assets.filter(asset => {
-                    if (isPhotoKept(asset.id) || isPhotoMarkedForDeletion(asset.id)) {
-                        totalProcessedRef.current++;
-                        return false;
-                    }
-                    if (asset.width < 300 || asset.height < 300) {
-                        totalProcessedRef.current++;
-                        return false;
-                    }
-                    return true;
-                });
-
-                const cachedAssets: { asset: MediaLibrary.Asset; labels: LabelWithConfidence[] }[] = [];
-                const uncachedAssets: MediaLibrary.Asset[] = [];
-
-                for (const asset of validAssets) {
-                    const cached = getCachedLabels(asset.id);
-                    if (cached && cached.length > 0) {
-                        cachedAssets.push({ asset, labels: cached });
-                    } else {
-                        uncachedAssets.push(asset);
-                    }
-                }
-
-                const cachedMatches: MediaLibrary.Asset[] = [];
-                for (const { asset, labels } of cachedAssets) {
-                    totalProcessedRef.current++;
-                    if (checkMatch(category, labels)) {
-                        cachedMatches.push(asset);
-                    }
-                }
-                if (cachedMatches.length > 0) {
-                    newlyFoundCount += cachedMatches.length;
-                    setMatchedPhotos(prev => [...prev, ...cachedMatches]);
-                }
-
-                for (let i = 0; i < uncachedAssets.length && scanId === scanIdRef.current; i += NATIVE_BATCH_SIZE) {
-                    const batch = uncachedAssets.slice(i, i + NATIVE_BATCH_SIZE);
-                    const uris = batch.map(a => a.uri);
-
-                    try {
-                        const results = await classifyImages(uris);
-
-                        if (scanId !== scanIdRef.current) break;
-
-                        const cacheEntries: { assetId: string; labels: CachedLabel[] }[] = [];
-                        const batchMatches: MediaLibrary.Asset[] = [];
-
-                        for (let j = 0; j < results.length; j++) {
-                            const result = results[j];
-                            const asset = batch[j];
-                            if (!result || !asset) continue;
-
-                            const labels: LabelWithConfidence[] = (result.labels || []).map(l => ({
-                                identifier: l.identifier,
-                                confidence: l.confidence,
-                            }));
-
-                            if (labels.length > 0) {
-                                cacheEntries.push({ assetId: asset.id, labels });
-                            }
-
-                            if (checkMatch(category, labels)) {
-                                batchMatches.push(asset);
-                            }
-
-                            totalProcessedRef.current++;
-                        }
-
-                        if (cacheEntries.length > 0) {
-                            setCachedLabelsBatch(cacheEntries);
-                        }
-
-                        if (batchMatches.length > 0) {
-                            newlyFoundCount += batchMatches.length;
-                            setMatchedPhotos(prev => [...prev, ...batchMatches]);
-                        }
-                    } catch (e) {
-                        console.error("[SmartClean] Batch classification FAILED:", e);
-                        totalProcessedRef.current += batch.length;
-                    }
-
-                    if (scanId !== scanIdRef.current) break;
-
-                    const progressPct = Math.min((totalProcessedRef.current / totalEstimate) * 100, 99);
-                    setProgress(progressPct);
-                    setScanStatusText(t("smart.scanProgress", { processed: totalProcessedRef.current, total: totalEstimate, found: newlyFoundCount }));
-
-                    await new Promise(resolve => setTimeout(resolve, 0));
-                }
-
-                hasNextPageRef.current = page.hasNextPage;
-                endCursorRef.current = page.endCursor;
-
-                if (newlyFoundCount >= DISPLAY_BATCH_SIZE || !hasNextPageRef.current) {
-                    break;
-                }
-            }
-
-            if (scanId !== scanIdRef.current) return;
-
-            if (!hasNextPageRef.current) {
-                setScanComplete(true);
-                setProgress(100);
-            }
-
-            setStep("REVIEW_RESULTS");
-
-        } catch (e) {
-            console.error("Scan error:", e);
-            if (scanId === scanIdRef.current) setStep("REVIEW_RESULTS");
-        } finally {
-            if (scanId === scanIdRef.current) setIsLoadingMore(false);
-        }
-    }, [checkMatch, getCachedLabels, setCachedLabelsBatch, isPhotoKept, isPhotoMarkedForDeletion]);
-
-    const cancelScan = useCallback(() => {
-        scanIdRef.current += 1;
-    }, []);
-
-    const runScan = async (category: SmartCategory) => {
-        scanIdRef.current += 1;
-        const scanId = scanIdRef.current;
-
-        setStep("SCANNING");
-        setProgress(0);
-        setScanStatusText(t("smart.requestingPermissions"));
-        setMatchedPhotos([]);
-        setSelectedForDeletion(new Set());
-        setScanComplete(false);
-        setIsSelectMode(false);
-
-        endCursorRef.current = undefined;
-        hasNextPageRef.current = true;
-        totalProcessedRef.current = 0;
-        totalAssetsEstimateRef.current = 0;
-        categoryRef.current = category;
-        customQueryRef.current = customQuery;
-
-        try {
-            const { status } = await MediaLibrary.requestPermissionsAsync();
-            if (scanId !== scanIdRef.current) return;
-            // RALPH FIX [BUG1]: On Android 14+ with READ_MEDIA_VISUAL_USER_SELECTED declared, limited
-            // photo access returns status "limited" (not in the PermissionStatus enum but valid at
-            // runtime). On iOS 14+ limited access also returns "limited". The previous strict
-            // status !== "granted" check caused Smart Clean to silently abort for any user who had
-            // granted limited access, making the feature appear completely broken on Android/iOS 14+.
-            if (status !== "granted" && (status as string) !== "limited") {
-                console.error("[SmartClean] Permission denied or undetermined:", status);
-                setStep("SELECT_CATEGORY");
-                return;
-            }
-
-            useClassificationCache.getState().clearAll();
-
-            const initialPage = await MediaLibrary.getAssetsAsync({ first: 1, mediaType: "photo" });
-            if (scanId !== scanIdRef.current) return;
-
-            totalAssetsEstimateRef.current = initialPage.totalCount;
-            setScanStatusText(t("smart.scanningPhotos", { count: initialPage.totalCount }));
-
-            await loadNextBatch(category, scanId);
-        } catch (e) {
-            console.error("Scan error:", e);
-            if (scanId === scanIdRef.current) setStep("REVIEW_RESULTS");
-        }
-    };
-
-    const startScan = async (category: SmartCategory) => {
-        setSelectedCategory(category);
-        if (category === "Custom") {
-            setStep("ENTER_CUSTOM_QUERY");
+            setShowCustomQuery(true);
         } else {
-            await runScan(category);
+            await startScan(category, "");
         }
-    };
+    }, []);
 
-    const handleEndReached = useCallback(() => {
-        if (!isLoadingMore && !scanComplete && categoryRef.current) {
-            loadNextBatch(categoryRef.current, scanIdRef.current);
-        }
-    }, [isLoadingMore, scanComplete, loadNextBatch]);
+    const handleCustomSearch = useCallback(async () => {
+        if (customQuery.trim().length === 0) return;
+        setShowCustomQuery(false);
+        await startScan("Custom", customQuery.trim());
+    }, [customQuery]);
+
+    const handleStop = useCallback(() => {
+        stopScan();
+    }, []);
 
     const toggleSelectMode = useCallback(() => {
         setIsSelectMode(prev => !prev);
@@ -432,29 +233,28 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
         .onFinalize(() => handleDragEnd());
 
     const confirmDeletion = useCallback(() => {
-        scanIdRef.current += 1;
+        stopScan();
         const photosToDelete = matchedPhotos.filter(p => selectedForDeletion.has(p.id));
         photosToDelete.forEach(p => addDeletionPhoto(p as unknown as PhotoAsset));
-        if (categoryRef.current && categoryRef.current !== "Custom") {
+        if (selectedCategory && selectedCategory !== "Custom") {
             const { useAchievementStore } = require("@/stores/achievement-store");
-            useAchievementStore.getState().recordSmartCleanCategory(categoryRef.current);
+            useAchievementStore.getState().recordSmartCleanCategory(selectedCategory);
         }
-        setStep("SELECT_CATEGORY");
-        setMatchedPhotos([]);
+        useSmartCleanStore.getState().resetSearch();
         setSelectedForDeletion(new Set());
         setIsSelectMode(false);
         router.push("/delete");
-    }, [matchedPhotos, selectedForDeletion, addDeletionPhoto]);
+    }, [matchedPhotos, selectedForDeletion, addDeletionPhoto, selectedCategory]);
 
     const renderListFooter = useCallback(() => {
-        if (!isLoadingMore) return null;
+        if (!isSearchRunning) return null;
         return (
             <View style={styles.loadingFooter}>
                 <ActivityIndicator color="#4ade80" size="small" />
                 <Text style={styles.loadingFooterText}>{t("smart.searchingMore")}</Text>
             </View>
         );
-    }, [isLoadingMore]);
+    }, [isSearchRunning]);
 
     const renderItem = useCallback(({ item, index }: { item: MediaLibrary.Asset; index: number }) => {
         const isSelected = selectedForDeletion.has(item.id);
@@ -500,6 +300,8 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                     style={[styles.container, { paddingTop: insets.top }]}
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
+                    // RALPH FIX [FEATURE-BG]: Disable scroll when search is running in background
+                    scrollEnabled={!isSearchRunning}
                 >
                     <View style={styles.headerTextContainer}>
                         <View style={styles.headerRow}>
@@ -520,20 +322,39 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
 
                     <View style={[styles.separator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.4), rgba(74,222,128,0))' }]} />
 
-                    <View style={styles.categoryGrid}>
+                    {/* RALPH FIX [FEATURE-BG]: Background search banner + Stop button */}
+                    {isSearchRunning && (
+                        <View style={styles.backgroundSearchBanner}>
+                            <Text style={styles.backgroundSearchText}>
+                                {t("smart.backgroundSearchRunning")}
+                            </Text>
+                            <Pressable
+                                style={({ pressed }) => [styles.stopButton, pressed && { opacity: 0.7 }]}
+                                onPress={handleStop}
+                            >
+                                <Square size={16} color="#ff6b6b" />
+                                <Text style={styles.stopButtonText}>{t("common.stop")}</Text>
+                            </Pressable>
+                        </View>
+                    )}
+
+                    {/* RALPH FIX [FEATURE-BG]: Disable category grid while search is running */}
+                    <View style={[styles.categoryGrid, isSearchRunning && styles.disabledOverlay]}>
                         {CATEGORIES.map((cat) => (
                             <Pressable
                                 key={cat.label}
                                 style={({ pressed }) => [
                                     styles.categoryCard,
-                                    pressed && styles.categoryCardPressed,
+                                    pressed && !isSearchRunning && styles.categoryCardPressed,
+                                    isSearchRunning && styles.categoryCardDisabled,
                                 ]}
-                                onPress={() => startScan(cat.label)}
+                                onPress={() => !isSearchRunning && handleCategoryPress(cat.label)}
+                                disabled={isSearchRunning}
                             >
                                 <View style={styles.categoryIconWrapper}>
-                                    <cat.Icon size={32} color="#4ade80" />
+                                    <cat.Icon size={32} color={isSearchRunning ? "rgba(74,222,128,0.3)" : "#4ade80"} />
                                 </View>
-                                <Text style={styles.categoryLabel}>{t(cat.labelKey)}</Text>
+                                <Text style={[styles.categoryLabel, isSearchRunning && styles.categoryLabelDisabled]}>{t(cat.labelKey)}</Text>
                             </Pressable>
                         ))}
                     </View>
@@ -548,7 +369,7 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
             <FuturisticHomeBackground style={styles.container}>
                 <View style={[styles.innerContainer, { paddingTop: insets.top }]}>
                     <View style={styles.header}>
-                        <Pressable onPress={() => setStep("SELECT_CATEGORY")} style={styles.backButton}>
+                        <Pressable onPress={() => setShowCustomQuery(false)} style={styles.backButton}>
                             <ArrowLeft size={22} color="#4ade80" />
                         </Pressable>
                         <View style={{ flex: 1 }}>
@@ -570,7 +391,7 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                             onChangeText={setCustomQuery}
                             autoFocus
                             returnKeyType="search"
-                            onSubmitEditing={() => runScan("Custom")}
+                            onSubmitEditing={handleCustomSearch}
                         />
                         <Pressable
                             style={({ pressed }) => [
@@ -578,7 +399,7 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                                 { opacity: customQuery.trim().length > 0 ? (pressed ? 0.8 : 1) : 0.4 },
                             ]}
                             disabled={customQuery.trim().length === 0}
-                            onPress={() => runScan("Custom")}
+                            onPress={handleCustomSearch}
                         >
                             <Search size={18} color="#fff" />
                             <Text style={styles.primaryButtonText}>{t("smart.search")}</Text>
@@ -598,27 +419,27 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                 </View>
                 <Text style={styles.scanningTitle}>
                     {selectedCategory === "Custom"
-                        ? t("smart.scanningForCustom", { query: customQuery })
+                        ? t("smart.scanningForCustom", { query: storeCustomQuery })
                         : t("smart.scanningFor", { category: t(CATEGORIES.find(c => c.label === selectedCategory)?.labelKey as CategoryLabelKey) })}
                 </Text>
                 <Text style={styles.scanningSubtitle}>
-                    {t("smart.percentComplete", { percent: Math.round(progress) })}
+                    {t("smart.percentComplete", { percent: Math.round(searchProgress) })}
                 </Text>
-                {scanStatusText ? (
-                    <Text style={styles.scanningDetail}>{scanStatusText}</Text>
+                {searchStatusText ? (
+                    <Text style={styles.scanningDetail}>{searchStatusText}</Text>
                 ) : null}
-                {progress > 0 && progress < 100 && (
+                {searchProgress > 0 && searchProgress < 100 && (
                     <View style={styles.progressBarContainer}>
-                        <View style={[styles.progressBar, { width: `${Math.min(progress, 100)}%`, experimental_backgroundImage: 'linear-gradient(to right, #4ade80, #38E0D2, #2dd4bf)' }]} />
+                        <View style={[styles.progressBar, { width: `${Math.min(searchProgress, 100)}%`, experimental_backgroundImage: 'linear-gradient(to right, #4ade80, #38E0D2, #2dd4bf)' }]} />
                     </View>
                 )}
+                {/* RALPH FIX [FEATURE-BG]: Background search message shown in scanning view */}
+                <Text style={styles.backgroundSearchInlineText}>
+                    {t("smart.backgroundSearchRunning")}
+                </Text>
                 <Pressable
                     style={({ pressed }) => [styles.cancelButton, pressed && { opacity: 0.7 }]}
-                    onPress={() => {
-                        cancelScan();
-                        setScanComplete(true);
-                        setStep("REVIEW_RESULTS");
-                    }}
+                    onPress={handleStop}
                 >
                     <Square size={16} color="#ff6b6b" />
                     <Text style={styles.cancelButtonText}>{t("common.stop")}</Text>
@@ -632,14 +453,17 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
         <FuturisticHomeBackground style={styles.container}>
             <View style={[styles.innerContainer, { paddingTop: insets.top }]}>
                 <View style={styles.header}>
-                    <Pressable onPress={() => { cancelScan(); setStep("SELECT_CATEGORY"); }} style={styles.backButton}>
+                    <Pressable onPress={() => {
+                        stopScan();
+                        useSmartCleanStore.getState().resetSearch();
+                    }} style={styles.backButton}>
                         <ArrowLeft size={22} color="#4ade80" />
                     </Pressable>
                     <View style={{ flex: 1 }}>
                         <Text style={styles.title} numberOfLines={1}>
                             {isSelectMode
                                 ? t("smart.selectedCount", { count: selectedForDeletion.size })
-                                : (selectedCategory === "Custom" ? `"${customQuery}"` : t(CATEGORIES.find(c => c.label === selectedCategory)?.labelKey as CategoryLabelKey))}
+                                : (selectedCategory === "Custom" ? `"${storeCustomQuery}"` : t(CATEGORIES.find(c => c.label === selectedCategory)?.labelKey as CategoryLabelKey))}
                         </Text>
                         {!isSelectMode && (
                             <Text style={styles.subtitle} numberOfLines={1}>
@@ -667,6 +491,22 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
 
                 <View style={[styles.separator, { experimental_backgroundImage: 'linear-gradient(to right, rgba(74,222,128,0), rgba(74,222,128,0.4), rgba(74,222,128,0))' }]} />
 
+                {/* RALPH FIX [FEATURE-BG]: Show background search banner in review results too */}
+                {isSearchRunning && (
+                    <View style={styles.reviewSearchBanner}>
+                        <Text style={styles.reviewSearchBannerText}>
+                            {t("smart.backgroundSearchRunning")}
+                        </Text>
+                        <Pressable
+                            style={({ pressed }) => [styles.stopButtonSmall, pressed && { opacity: 0.7 }]}
+                            onPress={handleStop}
+                        >
+                            <Square size={12} color="#ff6b6b" />
+                            <Text style={styles.stopButtonSmallText}>{t("common.stop")}</Text>
+                        </Pressable>
+                    </View>
+                )}
+
                 {matchedPhotos.length === 0 && scanComplete ? (
                     <View style={styles.emptyState}>
                         <View style={styles.emptyIconGlow}>
@@ -675,7 +515,7 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                         <Text style={styles.emptyLabel}>{t("smart.noMatchingPhotos")}</Text>
                         <Pressable
                             style={styles.primaryButton}
-                            onPress={() => setStep("SELECT_CATEGORY")}
+                            onPress={() => useSmartCleanStore.getState().resetSearch()}
                         >
                             <ArrowLeft size={18} color="#fff" />
                             <Text style={styles.primaryButtonText}>{t("smart.goBack")}</Text>
@@ -696,8 +536,6 @@ export function SmartCleanContent({ onBack }: { onBack?: () => void }) {
                                     onScroll={(e) => { scrollOffset.current = e.nativeEvent.contentOffset.y; }}
                                     scrollEventThrottle={16}
                                     scrollEnabled={!isScrollingDisabled}
-                                    onEndReached={handleEndReached}
-                                    onEndReachedThreshold={0.3}
                                     ListFooterComponent={renderListFooter}
                                     renderItem={renderItem}
                                 />
@@ -834,6 +672,99 @@ const styles = StyleSheet.create({
         marginTop: 2,
         color: "rgba(255,255,255,0.45)",
         lineHeight: 18,
+    },
+
+    // ── Background Search Banner ─────────────────────────────────
+    backgroundSearchBanner: {
+        marginBottom: 16,
+        padding: 16,
+        borderRadius: 14,
+        borderCurve: 'continuous',
+        backgroundColor: "rgba(74,222,128,0.08)",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.25)",
+        gap: 12,
+        alignItems: "center",
+    },
+    backgroundSearchText: {
+        color: "rgba(255,255,255,0.65)",
+        fontSize: 13,
+        lineHeight: 18,
+        textAlign: "center",
+    },
+    backgroundSearchInlineText: {
+        color: "rgba(255,255,255,0.45)",
+        fontSize: 12,
+        lineHeight: 16,
+        textAlign: "center",
+        marginTop: 16,
+        paddingHorizontal: 20,
+    },
+    reviewSearchBanner: {
+        marginHorizontal: 20,
+        marginBottom: 8,
+        padding: 10,
+        borderRadius: 10,
+        borderCurve: 'continuous',
+        backgroundColor: "rgba(74,222,128,0.06)",
+        borderWidth: 1,
+        borderColor: "rgba(74,222,128,0.2)",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+    },
+    reviewSearchBannerText: {
+        flex: 1,
+        color: "rgba(255,255,255,0.5)",
+        fontSize: 11,
+        lineHeight: 15,
+    },
+
+    // ── Stop Button ─────────────────────────────────────────────
+    stopButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        paddingVertical: 10,
+        paddingHorizontal: 20,
+        borderRadius: 20,
+        borderCurve: 'continuous',
+        backgroundColor: "rgba(255,107,107,0.12)",
+        borderWidth: 1,
+        borderColor: "rgba(255,107,107,0.4)",
+    },
+    stopButtonText: {
+        color: "#ff6b6b",
+        fontSize: 14,
+        fontWeight: "600",
+    },
+    stopButtonSmall: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingVertical: 5,
+        paddingHorizontal: 10,
+        borderRadius: 14,
+        borderCurve: 'continuous',
+        backgroundColor: "rgba(255,107,107,0.1)",
+        borderWidth: 1,
+        borderColor: "rgba(255,107,107,0.3)",
+    },
+    stopButtonSmallText: {
+        color: "#ff6b6b",
+        fontSize: 11,
+        fontWeight: "600",
+    },
+
+    // ── Disabled State ──────────────────────────────────────────
+    disabledOverlay: {
+        opacity: 0.4,
+    },
+    categoryCardDisabled: {
+        borderColor: "rgba(74,222,128,0.06)",
+    },
+    categoryLabelDisabled: {
+        color: "rgba(255,255,255,0.3)",
     },
 
     // ── Category Grid ───────────────────────────────────────────

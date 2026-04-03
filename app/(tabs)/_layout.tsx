@@ -1,11 +1,14 @@
 import { FuturisticTabBar } from "@/components/ui/futuristic-tab-bar";
+import { ScanCompleteToast } from "@/components/scan-complete-toast";
 import { Images, Heart, Trash2, Wrench, User } from "lucide-react-native";
 import { Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
+import { View } from "react-native";
 
 export default function TabLayout() {
   const { t } = useTranslation();
   return (
+    <View style={{ flex: 1 }}>
     <Tabs
       tabBar={(props) => <FuturisticTabBar {...props} />}
       screenOptions={{
@@ -67,5 +70,7 @@ export default function TabLayout() {
         options={{ href: null }}
       />
     </Tabs>
+    <ScanCompleteToast />
+    </View>
   );
 }

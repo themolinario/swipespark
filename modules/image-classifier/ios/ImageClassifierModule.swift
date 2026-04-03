@@ -9,13 +9,11 @@ public class ImageClassifierModule: Module {
     if uriString.hasPrefix("ph://") {
       return String(uriString.dropFirst(5))
     }
-
     guard let url = URL(string: uriString),
           url.scheme == "assets-library" || url.scheme == "asset-library",
           let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-          let idParam = components.queryItems?.first(where: { $0.name == "id" }) else {
-      return nil
-    }
+          let idParam = components.queryItems?.first(where: { $0.name == "id" })
+    else { return nil }
     return idParam.value
   }
 
@@ -26,14 +24,14 @@ public class ImageClassifierModule: Module {
 
       let options = PHImageRequestOptions()
       options.isSynchronous = true
-      options.deliveryMode = .highQualityFormat
-      options.isNetworkAccessAllowed = true
+      options.deliveryMode = .fastFormat
+      options.isNetworkAccessAllowed = false
       options.resizeMode = .fast
 
-      var cgImage: CGImage? = nil
+      var cgImage: CGImage?
       PHImageManager.default().requestImage(
         for: asset,
-        targetSize: CGSize(width: 512, height: 512),
+        targetSize: CGSize(width: 224, height: 224),
         contentMode: .aspectFit,
         options: options
       ) { image, _ in
@@ -44,7 +42,8 @@ public class ImageClassifierModule: Module {
 
     guard let url = URL(string: uriString),
           let data = try? Data(contentsOf: url),
-          let uiImage = UIImage(data: data) else { return nil }
+          let uiImage = UIImage(data: data)
+    else { return nil }
     return uiImage.cgImage
   }
 
@@ -56,17 +55,15 @@ public class ImageClassifierModule: Module {
 
     let request = VNClassifyImageRequest { request, error in
       guard error == nil,
-            let observations = request.results as? [VNClassificationObservation] else { return }
+            let observations = request.results as? [VNClassificationObservation]
+      else { return }
       resultLabels = observations
         .filter { $0.confidence > 0.3 }
         .prefix(10)
         .map { ["identifier": $0.identifier, "confidence": Double($0.confidence)] }
     }
 
-    do {
-      try handler.perform([request])
-    } catch { }
-
+    try? handler.perform([request])
     return resultLabels
   }
 
@@ -83,7 +80,7 @@ public class ImageClassifierModule: Module {
 
     AsyncFunction("classifyImages") { (uriStrings: [String], promise: Promise) in
       DispatchQueue.global(qos: .userInitiated).async {
-        let maxConcurrency = 8
+        let maxConcurrency = 4
         let semaphore = DispatchSemaphore(value: maxConcurrency)
         let group = DispatchGroup()
         let lock = NSLock()
@@ -98,12 +95,13 @@ public class ImageClassifierModule: Module {
               semaphore.signal()
               group.leave()
             }
-
-            let labels = self.classifySingleImage(uriString)
-            let entry: [String: Any] = ["uri": uriString, "labels": labels]
-            lock.lock()
-            results[index] = entry
-            lock.unlock()
+            autoreleasepool {
+              let labels = self.classifySingleImage(uriString)
+              let entry: [String: Any] = ["uri": uriString, "labels": labels]
+              lock.lock()
+              results[index] = entry
+              lock.unlock()
+            }
           }
         }
 
@@ -127,12 +125,10 @@ public class ImageClassifierModule: Module {
             }
           }
         } else if let url = URL(string: uriString) {
-          do {
-            let resources = try url.resourceValues(forKeys: [.fileSizeKey])
-            if let fileSize = resources.fileSize {
-              totalSize += Double(fileSize)
-            }
-          } catch { }
+          if let resources = try? url.resourceValues(forKeys: [.fileSizeKey]),
+             let fileSize = resources.fileSize {
+            totalSize += Double(fileSize)
+          }
         }
       }
 
@@ -143,7 +139,7 @@ public class ImageClassifierModule: Module {
       var totalSize: Double = 0
 
       let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
-      fetchResult.enumerateObjects { (asset, _, _) in
+      fetchResult.enumerateObjects { asset, _, _ in
         let resources = PHAssetResource.assetResources(for: asset)
         let primaryResource = resources.first(where: { $0.type == .photo }) ?? resources.first
         if let resource = primaryResource,
