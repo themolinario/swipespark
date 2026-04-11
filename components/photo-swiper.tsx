@@ -8,7 +8,7 @@ const VISIBLE_CARDS = 3;
 interface PhotoSwiperProps {
   photos: PhotoAsset[];
   currentIndex: number;
-  onSwipeLeft: (id: string) => void;
+  onSwipeLeft: () => void;
   onSwipeRight: () => void;
   cardHeight: number;
   onPress?: (photo: PhotoAsset) => void;
@@ -51,7 +51,7 @@ export const PhotoSwiper = memo(function PhotoSwiper({
           >
             <PhotoCard
               photo={photo}
-              onSwipeLeft={() => onSwipeLeft(photo.id)}
+              onSwipeLeft={onSwipeLeft}
               onSwipeRight={onSwipeRight}
               isActive={isActive}
               cardHeight={cardHeight}

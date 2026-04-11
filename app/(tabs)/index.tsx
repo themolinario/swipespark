@@ -7,17 +7,17 @@ import { PhotoSwiper } from "@/components/photo-swiper";
 import { StatsHeader } from "@/components/stats-header";
 import { FuturisticHomeBackground } from "@/components/ui/futuristic-home-background";
 import { usePhotos } from "@/hooks/use-photos";
-import { getAssetsSize, getAssetsSizeByIds } from "@/modules/image-classifier";
 import { PhotoAsset } from "@/services/media-library.service";
 import { usePhotoStore } from "@/stores/photo-store";
 import { useDuplicateStore } from "@/stores/duplicate-store";
 import { useStatsStore } from "@/stores/stats-store";
+import { calculateFreedBytes } from "@/utils/asset-size";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import * as Haptics from "expo-haptics";
 import { Trash2, Undo2 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Dimensions, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const SCREEN_HEIGHT = Dimensions.get("window").height;
@@ -63,23 +63,12 @@ export default function HomeScreen() {
 
   const currentPhoto = photos[currentIndex];
 
-  const handleDelete = useCallback(() => {
+  const handleMarkForDeletion = useCallback(() => {
     if (currentPhoto) {
       addDeletionPhoto(currentPhoto);
       markForDeletion(currentPhoto.id);
     }
   }, [currentPhoto, markForDeletion, addDeletionPhoto]);
-
-  const handleSwipeLeft = useCallback(
-    (id: string) => {
-      const photo = photos.find((p) => p.id === id);
-      if (photo) {
-        addDeletionPhoto(photo);
-        markForDeletion(id);
-      }
-    },
-    [photos, markForDeletion, addDeletionPhoto],
-  );
 
   const handleKeep = useCallback(() => {
     if (currentPhoto) {
@@ -89,28 +78,10 @@ export default function HomeScreen() {
   }, [currentPhoto, keepPhoto, addKeptPhoto]);
 
   const handleConfirmDeletion = useCallback(async () => {
-    // Calcola la dimensione prima di cancellare
-    let freedBytes = 0;
-    try {
-      const uris = deletionPhotos.map((p) => p.uri);
-      const ids = deletionPhotos.map((p) => p.id);
-      if (Platform.OS === 'android') {
-        freedBytes = await getAssetsSizeByIds(ids);
-        if (freedBytes <= 0) {
-          freedBytes = await getAssetsSize(uris);
-        }
-      } else {
-        freedBytes = await getAssetsSizeByIds(ids);
-        if (freedBytes <= 0) {
-          freedBytes = await getAssetsSize(uris);
-        }
-      }
-    } catch {
-      // fallback: procedi senza dimensione
-    }
-
-    const count = deletionPhotos.length;
     const ids = deletionPhotos.map((p) => p.id);
+    const uris = deletionPhotos.map((p) => p.uri);
+    const count = deletionPhotos.length;
+    const freedBytes = await calculateFreedBytes(ids, uris);
     const success = await confirmDeletion();
     if (success) {
       useDuplicateStore.getState().removeDuplicatesLocally(ids);
@@ -222,7 +193,7 @@ export default function HomeScreen() {
             <PhotoSwiper
               photos={photos}
               currentIndex={currentIndex}
-              onSwipeLeft={handleSwipeLeft}
+              onSwipeLeft={handleMarkForDeletion}
               onSwipeRight={handleKeep}
               cardHeight={Math.min(swiperContainerHeight - 32, DEFAULT_CARD_HEIGHT)}
               onPress={handleCardPress}
@@ -231,7 +202,7 @@ export default function HomeScreen() {
 
           <View style={[styles.footer, { paddingBottom: tabBarHeight + 80 }]}>
             <ActionButtons
-              onDelete={handleDelete}
+              onDelete={handleMarkForDeletion}
               onKeep={handleKeep}
               onUndo={handleUndo}
               canUndo={deletedCount > 0}
