@@ -25,10 +25,10 @@ interface PhotoGridItemProps {
   theme: PhotoGridItemTheme;
   defaultOpacity: number;
   selectedOpacity: number;
-  actionIcon: React.ReactNode;
   onPress: (photo: PhotoAsset) => void;
   onLongPress: (photo: PhotoAsset) => void;
-  onActionPress: (photo: PhotoAsset) => void;
+  actionIcon?: React.ReactNode;
+  onActionPress?: (photo: PhotoAsset) => void;
 }
 
 export const PhotoGridItem = React.memo(function PhotoGridItem({
@@ -40,9 +40,9 @@ export const PhotoGridItem = React.memo(function PhotoGridItem({
   theme,
   defaultOpacity,
   selectedOpacity,
-  actionIcon,
   onPress,
   onLongPress,
+  actionIcon,
   onActionPress,
 }: PhotoGridItemProps) {
   return (
@@ -83,18 +83,18 @@ export const PhotoGridItem = React.memo(function PhotoGridItem({
         >
           {isSelected && <Check size={14} color="#fff" />}
         </View>
-      ) : (
+      ) : actionIcon != null ? (
         <Pressable
           style={styles.actionButton}
           hitSlop={16}
           onPress={(e) => {
             e.stopPropagation?.();
-            onActionPress(photo);
+            onActionPress?.(photo);
           }}
         >
           {actionIcon}
         </Pressable>
-      )}
+      ) : null}
     </Pressable>
   );
 });
